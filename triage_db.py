@@ -4,6 +4,7 @@ import sqlite3 as sq
 import sys, os, time
 
 DB_NAME = 'triage_db.db'
+POPULATE_FROM = '/home/sliedes/scratch/afl/cases.minimized'
 
 #CREATE TABLE case_names (
 #    case_id INTEGER PRIMARY KEY NOT NULL,
@@ -121,13 +122,17 @@ class TriageDb(object):
                   'ORDER BY case_sizes.size')
         return c
 
+    def getNumberOfCases(self):
+        c = self.conn.cursor()
+        c.execute('SELECT count(*) from cases')
+        return c.fetchone()[0]
+
     def _addTestRun(self, versions):
         'Returns id of test run that can be passed to _testRunFinished().'
         c = self.conn.cursor()
         with self.conn:
             c.execute('INSERT INTO test_runs (start_time, versions) ' +
                       'VALUES (?, ?)', (int(time.time()), versions))
-        print('Test run '+str(c.lastrowid))
         return c.lastrowid
 
     def _testRunFinished(self, run_id):
@@ -153,8 +158,8 @@ class TriageDb(object):
                 c.execute('INSERT INTO result_strings (str) VALUES (?)',
                           (result_string,))
                 str_id = c.lastrowid
-            print('Result: run_id={}, sha={}, str_id={}'.format(
-                run_id, sha, str_id))
+            #print('Result: run_id={}, sha={}, str_id={}'.format(
+            #    run_id, sha, str_id))
             c.execute('INSERT INTO results (case_id, test_run, result) ' +
                       '    SELECT (SELECT id FROM cases WHERE sha1=?), '
                       '        ?, ?', (sha, run_id, str_id))
@@ -191,7 +196,7 @@ def main():
 
     db = TriageDb()
     if new:
-        db.populateCases('cases.minimized')
+        db.populateCases(POPULATE_FROM)
 
     #test(db)
 

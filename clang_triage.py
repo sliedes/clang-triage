@@ -11,9 +11,12 @@ TEST_CASE_DIR = '/home/sliedes/scratch/afl/cases.minimized'
 NINJA_PARAMS = ['-j8']
 
 TIMEOUT_CMD = ['timeout', '-k', '4', '4']
+
 CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-fno-crash-diagnostics', '-xc++', '-c',
                 '-o' '/dev/null', '-']
+
+#CLANG_PARAMS = '-cc1 -triple x86_64-unknown-linux-gnu -emit-llvm-bc -disable-free -main-file-name - -mrelocation-model static -mthread-model posix -mdisable-fp-elim -fmath-errno -masm-verbose -mconstructor-aliases -munwind-tables -fuse-init-array -target-cpu x86-64 -dwarf-column-info -coverage-file /dev/null -resource-dir /home/sliedes/local/llvm-trunk-rel/bin/../lib/clang/3.6.0 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/x86_64-linux-gnu/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/x86_64-linux-gnu/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/c++/4.9/backward -internal-isystem /usr/local/include -internal-isystem /home/sliedes/local/llvm-trunk-rel/bin/../lib/clang/3.6.0/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -std=c++11 -fdeprecated-macro -fdebug-compilation-dir /home/sliedes/t/clang/bug -ferror-limit 5 -fmessage-length 159 -mstackrealign -fobjc-runtime=gcc -fcxx-exceptions -fexceptions -fdiagnostics-show-option -fcolor-diagnostics -o /dev/null -x c++ -'.split(' ')
 
 PROJECTS = {'llvm' : LLVM_SRC, 'clang' : LLVM_SRC + '/tools/clang'}
 
@@ -160,11 +163,15 @@ def test_iter():
         pass # FIXME
 
     db = TriageDb()
+    numCases = db.getNumberOfCases()
     with db.testRun(str(newver)) as run:
+        i=1
         for sha, data in db.iterateCases():
             reason = test_input(data)
             if not reason:
                 reason = 'OK'
+            print('{}/{}: {}'.format(i, numCases, reason))
+            i += 1
             run.addResult(sha, reason)
             #reason = test_input(data, ['-O3'])
             #if reason:
