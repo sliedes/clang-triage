@@ -19,6 +19,12 @@ CREATE TABLE case_contents (
     contents BLOB NOT NULL,
     FOREIGN KEY(case_id) REFERENCES cases(id));
 
+CREATE TABLE case_sizes (
+    case_id INTEGER PRIMARY KEY,
+    size INTEGER NOT NULL,
+    FOREIGN KEY(case_id) REFERENCES cases(id));
+CREATE INDEX case_sizes_size ON case_sizes(size);
+
 CREATE TABLE test_runs (
     id INTEGER PRIMARY KEY,
     start_time INTEGER NOT NULL,
@@ -63,27 +69,34 @@ class TriageDb(object):
         c.execute('SELECT COUNT(*) FROM cases WHERE sha1=?', (sha,))
         res = c.fetchone()
         return bool(res[0])
-        
+
     def addCase(self, sha, contents):
-        c = self.conn.cursor()
+        self.addCases([(sha, contents)])
+
+    # FIXME this may be slow?
+    def addCases(self, cases):
+        'cases: iterator of (sha, contents)'
         with self.conn:
-            c.execute('INSERT INTO cases (sha1) VALUES (?)', (sha,))
-            val_id = c.lastrowid
-            c.execute('INSERT INTO case_contents (case_id, contents) VALUES (?, ?)',
-                      (val_id, contents))
+            c = self.conn.cursor()
+            for sha, contents in cases:
+                self._addCaseNames(c, [sha])
+                self._addCaseContents(c, [(sha, contents)])
 
     def _addCaseNames(self, cursor, casenames):
         cursor.executemany('INSERT INTO cases (sha1) VALUES (?)',
                            ((x,) for x in casenames))
 
     def _addCaseContents(self, cursor, cases):
-        with self.conn:
-            cursor.executemany(
-                'INSERT INTO case_contents (case_id, contents) \
-                    SELECT id, ? \
-                    FROM cases \
-                    WHERE sha1=?',
-                ((x[1], x[0]) for x in cases))
+        cursor.executemany(
+            'INSERT INTO case_contents (case_id, contents) ' +
+            '    SELECT id, ? ' +
+            '    FROM cases ' +
+            '    WHERE sha1=?',
+            ((x[1], x[0]) for x in cases))
+        cursor.execute(
+            'INSERT INTO case_sizes (case_id, size) '  +
+            '    SELECT case_id, length(contents) ' +
+            '    FROM case_contents')
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
@@ -98,16 +111,32 @@ class TriageDb(object):
                                   ((sha, readFile(os.path.join(cases_path, fname)))
                                    for sha, fname in zip(case_names, case_files)))
 
-        
+    def iterateCases(self):
+        'Iterate through (sha1, contents) pairs.'
+        c = self.conn.cursor()
+        c.execute('SELECT cases.sha1, case_contents.contents ' +
+                  'FROM cases, case_contents, case_sizes '
+                  'WHERE case_contents.case_id = cases.id ' +
+                  '      AND case_sizes.case_id = cases.id ' +
+                  'ORDER BY case_sizes.size')
+        return c
+
+
 def main():
+    new = False
     if not os.path.exists(DB_NAME):
         print(DB_NAME + ' does not exist; creating...')
         TriageDb.create()
+        new = True
+
     db = TriageDb()
-    db.populateCases('cases.minimized')
-    
+
+    if new:
+        db.populateCases('cases.minimized')
+
+    for name, contents in db.iterateCases():
+        print((name, len(contents)))
 
 
 if __name__ == '__main__':
     main()
-
