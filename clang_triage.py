@@ -5,7 +5,7 @@ import os, sys, subprocess as subp, tempfile, copy
 TOP = '/home/sliedes/scratch/build/clang-triage'
 LLVM_SRC = TOP + '/llvm.src'
 BUILD = TOP + '/clang-triage.ninja'
-TEST_CASE_DIR = '/home/sliedes/t/clang/crash-out/src'
+TEST_CASE_DIR = '/home/sliedes/scratch/afl/cases.minimized'
 
 NINJA_PARAMS = ['-j8']
 

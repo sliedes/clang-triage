@@ -2,3 +2,4 @@
 min-traces
 *.pyc
 __pycache__
+triage_db.db
