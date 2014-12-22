@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os, sys, subprocess as subp, tempfile, copy
+from triage_db import TriageDb
 
 TOP = '/home/sliedes/scratch/build/clang-triage'
 LLVM_SRC = TOP + '/llvm.src'
@@ -27,7 +28,7 @@ class CommitInfo(object):
         out = subp.check_output(CMD, cwd=self.path).decode('utf-8')
         assert out.endswith('\n')
         return out[:-1]
-        
+
     def __init__(self, path, name = None):
         self.path = path
 
@@ -103,7 +104,7 @@ def check_for_clang_crash(output, retval):
     if retval > 128:
         return 'Killed by signal %d' % (retval-128)
     return None
-    
+
 
 def test_input(data, extra_params=[]):
     CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
@@ -148,19 +149,30 @@ def run_creduce(data):
         with open(cpp_fname, 'rb') as f:
             return f.read()
 
+def test_iter():
+    '''Build new version if available and execute tests.
+    Returns False if no new versions were available and nothing done.'''
+    oldver = sorted(get_versions().items())
+    #update_and_build()
+    newver = sorted(get_versions().items())
+    if newver == oldver:
+        #return False
+        pass # FIXME
+
+    db = TriageDb()
+    with db.testRun(str(newver)) as run:
+        for sha, data in db.iterateCases():
+            reason = test_input(data)
+            if not reason:
+                reason = 'OK'
+            run.addResult(sha, reason)
+            #reason = test_input(data, ['-O3'])
+            #if reason:
+            #    s = '{sha}\t-O3 only: {reason}'
+            #    print(s.format(sha=sha, reason=reason))
 
 def main():
-    print(sorted(get_versions().items()))
-    for sha, data in inputs():
-        reason = test_input(data)
-        if reason:
-            s = '{sha}\t{reason}'
-            print(s.format(sha=sha, reason=reason))
-            continue
-        #reason = test_input(data, ['-O3'])
-        #if reason:
-        #    s = '{sha}\t-O3 only: {reason}'
-        #    print(s.format(sha=sha, reason=reason))
+    test_iter()
 
 
 if __name__ == '__main__':

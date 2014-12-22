@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sqlite3 as sq
-import sys, os
+import sys, os, time
 
 DB_NAME = 'triage_db.db'
 
@@ -37,12 +37,12 @@ CREATE TABLE result_strings (
 
 CREATE TABLE results (
     id INTEGER PRIMARY KEY,
-    case_id TEXT NOT NULL,
+    case_id INTEGER NOT NULL,
     test_run INTEGER NOT NULL,
     result INTEGER NOT NULL,
     FOREIGN KEY(case_id) REFERENCES cases(id),
     FOREIGN KEY(test_run) REFERENCES test_runs(id),
-    FOREIGN KEY(result) REFERENCES result_strings(str));
+    FOREIGN KEY(result) REFERENCES result_strings(id));
 CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);
@@ -121,6 +121,66 @@ class TriageDb(object):
                   'ORDER BY case_sizes.size')
         return c
 
+    def _addTestRun(self, versions):
+        'Returns id of test run that can be passed to _testRunFinished().'
+        c = self.conn.cursor()
+        with self.conn:
+            c.execute('INSERT INTO test_runs (start_time, versions) ' +
+                      'VALUES (?, ?)', (int(time.time()), versions))
+        print('Test run '+str(c.lastrowid))
+        return c.lastrowid
+
+    def _testRunFinished(self, run_id):
+        c = self.conn.cursor()
+        with self.conn:
+            c.execute('UPDATE test_runs SET end_time = ? ' +
+                      'WHERE id = ?', (int(time.time()), run_id))
+
+    def testRun(self, versions):
+        'A context manager for test runs.'
+        return TriageDb.TestRunContext(self, versions)
+
+    def _addResult(self, run_id, sha, result_string):
+        c = self.conn.cursor()
+        # first check if the result string is known
+        c.execute('SELECT id FROM result_strings ' +
+                  'WHERE str=?', (result_string, ))
+        str_id = c.fetchone()
+        if not str_id is None:
+            str_id = str_id[0]
+        with self.conn:
+            if str_id is None:
+                c.execute('INSERT INTO result_strings (str) VALUES (?)',
+                          (result_string,))
+                str_id = c.lastrowid
+            print('Result: run_id={}, sha={}, str_id={}'.format(
+                run_id, sha, str_id))
+            c.execute('INSERT INTO results (case_id, test_run, result) ' +
+                      '    SELECT (SELECT id FROM cases WHERE sha1=?), '
+                      '        ?, ?', (sha, run_id, str_id))
+
+    class TestRunContext(object):
+        def __init__(self, db, versions):
+            self.db = db
+            self.versions = versions
+
+        def __enter__(self):
+            self.run_id = self.db._addTestRun(self.versions)
+            return self
+
+        def __exit__(self, type, value, traceback):
+            self.db._testRunFinished(self.run_id)
+
+        def addResult(self, sha, result_string):
+            self.db._addResult(self.run_id, sha, result_string)
+
+
+def test(db):
+    for name, contents in db.iterateCases():
+        print((name, len(contents)))
+
+    with db.testRun('version 1') as run:
+        run.addResult('21b79d40b266c4f209d86247c031982e25891dc1', 'error')
 
 def main():
     new = False
@@ -130,12 +190,10 @@ def main():
         new = True
 
     db = TriageDb()
-
     if new:
         db.populateCases('cases.minimized')
 
-    for name, contents in db.iterateCases():
-        print((name, len(contents)))
+    #test(db)
 
 
 if __name__ == '__main__':
