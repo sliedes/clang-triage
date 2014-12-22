@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, subprocess as subp, tempfile, copy
+import os, sys, subprocess as subp, tempfile, copy, time
 from triage_db import TriageDb
 
 TOP = '/home/sliedes/scratch/build/clang-triage'
@@ -20,6 +20,8 @@ PROJECTS = {'llvm' : LLVM_SRC, 'clang' : LLVM_SRC + '/tools/clang'}
 CLANG_BINARY = BUILD + '/bin/clang'
 
 CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'
+
+MIN_GIT_CHECKOUT_INTERVAL = 30*60 # seconds
 
 
 class CommitInfo(object):
@@ -63,7 +65,13 @@ def git_pull(path):
         raise
 
 
+LAST_UPDATED = 0
+
 def update_all():
+    global LAST_UPDATED
+    elapsed = time.time() - LAST_UPDATED
+    if elapsed < MIN_GIT_CHECKOUT_INTERVAL:
+        time.sleep(MIN_GIT_CHECKOUT_INTERVAL-elapsed)
     for proj, path in PROJECTS.items():
         git_pull(path)
 
@@ -153,11 +161,10 @@ def test_iter():
     '''Build new version if available and execute tests.
     Returns False if no new versions were available and nothing done.'''
     oldver = sorted(get_versions().items())
-    #update_and_build()
+    update_and_build() # sleeps
     newver = sorted(get_versions().items())
     if newver == oldver:
-        #return False
-        pass # FIXME
+        return False
 
     db = TriageDb()
     with db.testRun(str(newver)) as run:
@@ -172,7 +179,8 @@ def test_iter():
             #    print(s.format(sha=sha, reason=reason))
 
 def main():
-    test_iter()
+    while True:
+        test_iter()
 
 
 if __name__ == '__main__':
