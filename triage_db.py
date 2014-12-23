@@ -29,8 +29,10 @@ CREATE INDEX case_sizes_size ON case_sizes(size);
 CREATE TABLE test_runs (
     id INTEGER PRIMARY KEY,
     start_time INTEGER NOT NULL,
-    end_time INTEGER, versions TEXT NOT NULL);
+    end_time INTEGER,
+    versions TEXT NOT NULL);
 CREATE INDEX test_runs_start_time ON test_runs(start_time);
+CREATE INDEX test_runs_versions ON test_runs(versions);
 
 CREATE TABLE result_strings (
     id INTEGER PRIMARY KEY,
@@ -47,6 +49,7 @@ CREATE TABLE results (
 CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);
+CREATE UNIQUE INDEX results_case_id_test_run ON results(case_id, test_run);
 '''.strip()
 
 def readFile(path):
@@ -56,8 +59,7 @@ def readFile(path):
 class TriageDb(object):
     def __init__(self):
         self.conn = sq.connect('file:{}?mode=rw'.format(DB_NAME), uri=True)
-        with self.conn:
-            self.conn.execute('PRAGMA foreign_keys = ON')
+        self.conn.execute('PRAGMA foreign_keys = ON')
 
     @staticmethod
     def create():
@@ -111,6 +113,7 @@ class TriageDb(object):
             self._addCaseContents(c,
                                   ((sha, readFile(os.path.join(cases_path, fname)))
                                    for sha, fname in zip(case_names, case_files)))
+            self.conn.commit()
 
     def iterateCases(self):
         'Iterate through (sha1, contents) pairs.'
@@ -164,6 +167,19 @@ class TriageDb(object):
                       '    SELECT (SELECT id FROM cases WHERE sha1=?), '
                       '        ?, ?', (sha, run_id, str_id))
 
+    def getLastRunTimeByVersion(self, versions):
+        '''Returns (start_time, end_time) of the last test run with this version.
+           If no test has been run with this version, returns None.
+           If a test run has been started but not finished, returns (start_time, None).'''
+        c = self.conn.cursor()
+        c.execute('SELECT start_time, end_time ' +
+                  'FROM test_runs ' +
+                  'WHERE versions=? ' +
+                  'ORDER BY start_time ' +
+                  'LIMIT 1', (versions, ))
+        res = c.fetchone()
+        return res
+
     class TestRunContext(object):
         def __init__(self, db, versions):
             self.db = db
@@ -184,8 +200,8 @@ def test(db):
     for name, contents in db.iterateCases():
         print((name, len(contents)))
 
-    with db.testRun('version 1') as run:
-        run.addResult('21b79d40b266c4f209d86247c031982e25891dc1', 'error')
+    #with db.testRun('version 1') as run:
+    #    run.addResult('21b79d40b266c4f209d86247c031982e25891dc1', 'error')
 
 def main():
     new = False
@@ -198,7 +214,7 @@ def main():
     if new:
         db.populateCases(POPULATE_FROM)
 
-    #test(db)
+    test(db)
 
 
 if __name__ == '__main__':

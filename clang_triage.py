@@ -16,8 +16,6 @@ CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-fno-crash-diagnostics', '-xc++', '-c',
                 '-o' '/dev/null', '-']
 
-#CLANG_PARAMS = '-cc1 -triple x86_64-unknown-linux-gnu -emit-llvm-bc -disable-free -main-file-name - -mrelocation-model static -mthread-model posix -mdisable-fp-elim -fmath-errno -masm-verbose -mconstructor-aliases -munwind-tables -fuse-init-array -target-cpu x86-64 -dwarf-column-info -coverage-file /dev/null -resource-dir /home/sliedes/local/llvm-trunk-rel/bin/../lib/clang/3.6.0 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/x86_64-linux-gnu/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/x86_64-linux-gnu/c++/4.9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../include/c++/4.9/backward -internal-isystem /usr/local/include -internal-isystem /home/sliedes/local/llvm-trunk-rel/bin/../lib/clang/3.6.0/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -std=c++11 -fdeprecated-macro -fdebug-compilation-dir /home/sliedes/t/clang/bug -ferror-limit 5 -fmessage-length 159 -mstackrealign -fobjc-runtime=gcc -fcxx-exceptions -fexceptions -fdiagnostics-show-option -fcolor-diagnostics -o /dev/null -x c++ -'.split(' ')
-
 PROJECTS = {'llvm' : LLVM_SRC, 'clang' : LLVM_SRC + '/tools/clang'}
 
 CLANG_BINARY = BUILD + '/bin/clang'
@@ -73,11 +71,14 @@ LAST_UPDATED = 0
 def update_all():
     global LAST_UPDATED
     elapsed = time.time() - LAST_UPDATED
-    if elapsed < MIN_GIT_CHECKOUT_INTERVAL:
-        time.sleep(MIN_GIT_CHECKOUT_INTERVAL-elapsed)
+    left = MIN_GIT_CHECKOUT_INTERVAL - elapsed
+    if left > 0:
+        print('Sleeping for {} seconds...'.format(left),
+              file=sys.stderr)
+        time.sleep(left)
     for proj, path in PROJECTS.items():
         git_pull(path)
-
+    LAST_UPDATED = time.time()
 
 def get_versions():
     out = {}
@@ -86,10 +87,11 @@ def get_versions():
         out[proj] = info.svn_id
     return out
 
+def get_versions_str():
+    return str(sorted(get_versions().items()))
 
 def build():
     subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
-
 
 def inputs():
     files = [x for x in os.listdir(TEST_CASE_DIR) if x.endswith('.cpp.lz')]
@@ -127,9 +129,9 @@ def test_input(data, extra_params=[]):
 
 
 def update_and_build():
-    print(sorted(get_versions().items()))
+    print('Version: ' + get_versions_str())
     update_all()
-    print(sorted(get_versions().items()))
+    print('Version: ' + get_versions_str())
     build()
 
 
@@ -160,24 +162,46 @@ def run_creduce(data):
         with open(cpp_fname, 'rb') as f:
             return f.read()
 
+def update_and_check_if_should_run(db):
+    update_and_build() # sleeps
+    versions = get_versions_str()
+
+    lastRun = db.getLastRunTimeByVersions(versions)
+    if lastRun and lastRun[1]:
+        print('A test run with this version was started at {} and completed at {}. Skipping test.'.format(
+            time.asctime(lastrun[0]), time.asctime(lastrun[1])), file=sys.stderr)
+        return False
+    elif lastRun:
+        print('A test run with this version was started at %s, but not completed. Running test...'.format(
+            time.asctime(lastrun[0])), file=sys.stderr)
+    else:
+        print('Version previously unseen. Running test...', file=sys.stderr)
+
+    return True
+
+
 def test_iter():
     '''Build new version if available and execute tests.
     Returns False if no new versions were available and nothing done.'''
-    oldver = sorted(get_versions().items())
-    update_and_build() # sleeps
-    newver = sorted(get_versions().items())
-    if newver == oldver:
-        return False
 
     db = TriageDb()
+
+    #if not update_and_check_if_should_run(db):
+    #    return False
+
+    versions = get_versions_str()
+
+    # FIXME: If we at some point support concurrent test runners, there is a
+    # race between checking version and starting the test run.
     numCases = db.getNumberOfCases()
-    with db.testRun(str(newver)) as run:
+    with db.testRun(versions) as run:
         i=1
         for sha, data in db.iterateCases():
-            reason = test_input(data)
-            if not reason:
-                reason = 'OK'
-            print('{}/{}: {}'.format(i, numCases, reason))
+            #reason = test_input(data)
+            #if not reason:
+            #    reason = 'OK'
+            reason = ''
+            print('{}/{} ({}): {}'.format(i, numCases, sha, reason))
             i += 1
             run.addResult(sha, reason)
             #reason = test_input(data, ['-O3'])
