@@ -169,25 +169,26 @@ def update_and_check_if_should_run(db):
     lastRun = db.getLastRunTimeByVersions(versions)
     if lastRun and lastRun[1]:
         print('A test run with this version was started at {} and completed at {}. Skipping test.'.format(
-            time.asctime(lastrun[0]), time.asctime(lastrun[1])), file=sys.stderr)
+            time.asctime(time.gmtime(lastRun[0])), time.asctime(time.gmtime(lastRun[1]))),
+              file=sys.stderr)
         return False
     elif lastRun:
         print('A test run with this version was started at %s, but not completed. Running test...'.format(
-            time.asctime(lastrun[0])), file=sys.stderr)
+            time.asctime(time.gmtime(lastRun[0]))), file=sys.stderr)
     else:
         print('Version previously unseen. Running test...', file=sys.stderr)
 
     return True
 
 
-def test_iter():
+def test_iter(start_from_current=False):
     '''Build new version if available and execute tests.
     Returns False if no new versions were available and nothing done.'''
 
     db = TriageDb()
 
-    #if not update_and_check_if_should_run(db):
-    #    return False
+    if not start_from_current and not update_and_check_if_should_run(db):
+        return False
 
     versions = get_versions_str()
 
@@ -196,22 +197,30 @@ def test_iter():
     numCases = db.getNumberOfCases()
     with db.testRun(versions) as run:
         i=1
+        numBad = 0
         for sha, data in db.iterateCases():
-            #reason = test_input(data)
-            #if not reason:
-            #    reason = 'OK'
-            reason = ''
-            print('{}/{} ({}): {}'.format(i, numCases, sha, reason))
+            reason = test_input(data)
+            if not reason:
+                reason = 'OK'
+            else:
+                numBad += 1
+            #print('{}/{} ({}): {}'.format(i, numCases, sha, reason))
+            print('\r{curr}/{max}  {nbad} bad ({prop:.1%})'.format(
+                curr=i, max=numCases, nbad=numBad,
+                prop=numBad/i), end='', file=sys.stderr)
+
             i += 1
             run.addResult(sha, reason)
             #reason = test_input(data, ['-O3'])
             #if reason:
             #    s = '{sha}\t-O3 only: {reason}'
             #    print(s.format(sha=sha, reason=reason))
+        print(file=sys.stderr)
 
 def main():
+    #test_iter(True)
     while True:
-        test_iter()
+        test_iter(False)
 
 
 if __name__ == '__main__':
