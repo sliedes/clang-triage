@@ -1,0 +1,57 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>Clang triage report</title>
+    <style type="text/css">
+      table, th, td { border: 1px solid black; }
+      a.mo { font-family: monospace; }
+    </style>
+  </head>
+
+  <body>
+    <h2>Statistics</h2>
+    <table>
+      <tr><td>Test runs completed</td><td>{{numRunsCompleted}}</td></tr>
+      <tr><td>Number of inputs in corpus</td><td>{{numInputs}}</td></tr>
+      <tr><td>Last run completed</td><td>{{lastRunCompleted}}</td></tr>
+    </table>
+    <h2>Test runs</h2>
+    {{#testRuns}}
+    <h3>Run #{{id}} on {{date}}, duration {{duration}} seconds</h3>
+    <p>Version string: {{versions}}</p>
+    {{#anyChanged?}}
+    <p>Changed failures:</p>
+    <table>
+      <tr><th>Test case</th><th>Failure reason</th></tr>
+      {{#newFailures}}
+      <tr><td><a href="{{url}}">{{shortCase}}</a></td><td>
+	  <table style="border: 0">
+	    <tr><td>New:</td><td>{{reason}}</td></tr>
+	    <tr><td>Was:</td><td>{{oldReason}}</td></tr>
+	  </table>
+      </td></tr>
+      {{/newFailures}}
+    </table>
+    {{/anyChanged?}}
+    {{^newFailures}}
+    <p>No changes in failed test cases.</p>
+    {{/newFailures}}
+    <hr/>
+    {{/testRuns}}
+    <h2>Test case summary for last test run</h2>
+
+    <p>You can also download a <a href="all_cases.tar.bz2">tarball of
+	all the test cases</a>.</p>
+
+    {{#failures}}
+    <p><h3>{{reason}}</h3></p>
+    <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
+    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{/cases}}</p>
+    <hr/>
+    {{/failures}}
+    {{^failures}}
+    <p>No failed test cases.</p>
+    {{/failures}}
+  </body>
+</html>

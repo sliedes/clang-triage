@@ -14,18 +14,18 @@ CREATE TABLE cases (
 CREATE TABLE case_contents (
     case_id BIGINT PRIMARY KEY,
     contents BYTEA NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id));
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE);
 
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
     size INTEGER NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id));
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE);
 CREATE INDEX case_sizes_size ON case_sizes(size);
 
 CREATE TABLE test_runs (
     id BIGSERIAL PRIMARY KEY,
     start_time BIGINT NOT NULL,
-    end_time BIGINT,
+    end_time BIGINT NOT NULL,
     versions TEXT NOT NULL);
 CREATE INDEX test_runs_start_time ON test_runs(start_time);
 CREATE INDEX test_runs_versions ON test_runs(versions);
@@ -39,9 +39,9 @@ CREATE TABLE results (
     case_id BIGINT NOT NULL,
     test_run BIGINT NOT NULL,
     result BIGINT NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id),
-    FOREIGN KEY(test_run) REFERENCES test_runs(id),
-    FOREIGN KEY(result) REFERENCES result_strings(id));
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE,
+    FOREIGN KEY(test_run) REFERENCES test_runs(id) ON UPDATE CASCADE,
+    FOREIGN KEY(result) REFERENCES result_strings(id)) ON UPDATE CASCADE;
 CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);
@@ -57,15 +57,15 @@ class TriageDb(object):
         self.conn = pg.connect('dbname=' + DB_NAME)
 
     def createSchema(self):
-        c = self.conn.cursor()
         with self.conn:
-            c.execute(_CREATE_TABLES_SQL)
+            with self.conn.cursor() as c:
+                c.execute(_CREATE_TABLES_SQL)
 
     def doesCaseExist(self, sha):
-        c = self.conn.cursor()
-        c.execute('SELECT COUNT(*) FROM cases WHERE sha1=%s', sha)
-        res = c.fetchone()
-        return bool(res[0])
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute('SELECT COUNT(*) FROM cases WHERE sha1=%s', sha)
+                return bool(c.fetchone()[0])
 
     def addCase(self, sha, contents):
         self.addCases([(sha, contents)])
@@ -74,10 +74,10 @@ class TriageDb(object):
     def addCases(self, cases):
         'cases: iterator of (sha, contents)'
         with self.conn:
-            c = self.conn.cursor()
-            for sha, contents in cases:
-                self._addCaseNames(c, [sha])
-                self._addCaseContents(c, [(sha, contents)])
+            with self.conn.cursor() as c:
+                for sha, contents in cases:
+                    self._addCaseNames(c, [sha])
+                    self._addCaseContents(c, [(sha, contents)])
 
     def _addCaseNames(self, cursor, casenames):
         cursor.executemany('INSERT INTO cases (sha1) VALUES (%s)',
@@ -100,39 +100,40 @@ class TriageDb(object):
         case_names = [sha for sha, cpp in [x.split('.') for x in case_files]]
         #print('Adding names...')
         with self.conn:
-            c = self.conn.cursor()
-            self._addCaseNames(c, case_names)
+            with self.conn.cursor() as c:
+                self._addCaseNames(c, case_names)
 
-            # FIXME calculate sha1
-            self._addCaseContents(c,
-                                  ((sha, readFile(os.path.join(cases_path, fname)))
-                                   for sha, fname in zip(case_names, case_files)))
-            self.conn.commit()
+                # FIXME calculate sha1
+                self._addCaseContents(c,
+                                      ((sha, readFile(os.path.join(cases_path, fname)))
+                                       for sha, fname in zip(case_names, case_files)))
 
     def iterateCases(self):
         'Iterate through (sha1, contents) pairs.'
-        c = self.conn.cursor()
-        c.execute('SELECT cases.sha1, case_contents.contents ' +
-                  'FROM cases, case_contents, case_sizes '
-                  'WHERE case_contents.case_id = cases.id ' +
-                  '      AND case_sizes.case_id = cases.id ' +
-                  'ORDER BY case_sizes.size')
-        return c
+        with self.conn:
+            c = self.conn.cursor()
+            c.execute('SELECT cases.sha1, case_contents.contents ' +
+                      'FROM cases, case_contents, case_sizes '
+                      'WHERE case_contents.case_id = cases.id ' +
+                      '      AND case_sizes.case_id = cases.id ' +
+                      'ORDER BY case_sizes.size')
+            return c
 
     def getNumberOfCases(self):
-        c = self.conn.cursor()
-        c.execute('SELECT count(*) from cases')
-        return c.fetchone()[0]
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute('SELECT count(*) from cases')
+                return c.fetchone()[0]
 
     def _addTestRun(self, versions, start_time, end_time, results):
         'Returns id of test run that can be passed to _testRunFinished().'
-        c = self.conn.cursor()
         with self.conn:
-            c.execute('INSERT INTO test_runs (start_time, end_time, versions) ' +
-                      'VALUES (%s, %s, %s) RETURNING id',
-                      (start_time, end_time, versions))
-            run_id = c.fetchone()[0]
-            self._addResults(run_id, results)
+            with self.conn.cursor() as c:
+                c.execute('INSERT INTO test_runs (start_time, end_time, versions) ' +
+                          'VALUES (%s, %s, %s) RETURNING id',
+                          (start_time, end_time, versions))
+                run_id = c.fetchone()[0]
+                self._addResults(c, run_id, results)
 
     #def _testRunFinished(self, run_id):
     #    c = self.conn.cursor()
@@ -144,9 +145,9 @@ class TriageDb(object):
         'A context manager for test runs.'
         return TriageDb.TestRunContext(self, versions)
 
-    def _addResults(self, run_id, results):
+    def _addResults(self, cursor, run_id, results):
         'results: [(sha, result_string)]'
-        c = self.conn.cursor()
+        c = cursor
         # insert result strings if they do not already exist
         unique_results = set(x[1] for x in results)
         c.executemany('INSERT INTO result_strings (str) SELECT %s ' +
@@ -161,16 +162,15 @@ class TriageDb(object):
 
     def getLastRunTimeByVersions(self, versions):
         '''Returns (start_time, end_time) of the last test run with this version.
-           If no test has been run with this version, returns None.
-           If a test run has been started but not finished, returns (start_time, None).'''
-        c = self.conn.cursor()
-        c.execute('SELECT start_time, end_time ' +
-                  'FROM test_runs ' +
-                  'WHERE versions=%s ' +
-                  'ORDER BY start_time ' +
-                  'LIMIT 1', (versions, ))
-        res = c.fetchone()
-        return res
+           If no test has been run with this version, returns None.'''
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute('SELECT start_time, end_time ' +
+                          'FROM test_runs ' +
+                          'WHERE versions=%s ' +
+                          'ORDER BY start_time ' +
+                          'LIMIT 1', (versions, ))
+                return c.fetchone()
 
     class TestRunContext(object):
         def __init__(self, db, versions):

@@ -22,7 +22,7 @@ CLANG_BINARY = BUILD + '/bin/clang'
 
 CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'
 
-MIN_GIT_CHECKOUT_INTERVAL = 30*60 # seconds
+MIN_GIT_CHECKOUT_INTERVAL = 10*60 # seconds
 
 
 class CommitInfo(object):
@@ -73,7 +73,7 @@ def update_all():
     elapsed = time.time() - LAST_UPDATED
     left = MIN_GIT_CHECKOUT_INTERVAL - elapsed
     if left > 0:
-        print('Sleeping for {} seconds...'.format(left),
+        print('Sleeping for {:.1f} seconds...'.format(left),
               file=sys.stderr)
         time.sleep(left)
     for proj, path in PROJECTS.items():
@@ -167,14 +167,11 @@ def update_and_check_if_should_run(db):
     versions = get_versions_str()
 
     lastRun = db.getLastRunTimeByVersions(versions)
-    if lastRun and lastRun[1]:
+    if lastRun:
         print('A test run with this version was started at {} and completed at {}. Skipping test.'.format(
-            time.asctime(time.gmtime(lastRun[0])), time.asctime(time.gmtime(lastRun[1]))),
+            time.asctime(time.localtime(lastRun[0])), time.asctime(time.localtime(lastRun[1]))),
               file=sys.stderr)
         return False
-    elif lastRun:
-        print('A test run with this version was started at %s, but not completed. Running test...'.format(
-            time.asctime(time.gmtime(lastRun[0]))), file=sys.stderr)
     else:
         print('Version previously unseen. Running test...', file=sys.stderr)
 
