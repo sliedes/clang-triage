@@ -2,10 +2,12 @@
 	  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Clang triage report</title>
     <style type="text/css">
-      table, th, td { border: 1px solid black; }
+      table, th, td { border: 0px solid black; }
       a.mo { font-family: monospace; }
+      span.ver {font-family: monospace; }
     </style>
   </head>
 
@@ -16,12 +18,12 @@
       <tr><td>Number of inputs in corpus</td><td>{{numInputs}}</td></tr>
       <tr><td>Last run completed</td><td>{{lastRunCompleted}}</td></tr>
     </table>
-    <h2>Test runs</h2>
+    <h2>Changes between test runs</h2>
     {{#testRuns}}
-    <h3>Run #{{id}} on {{date}}, duration {{duration}} seconds</h3>
-    <p>Version string: {{versions}}</p>
     {{#anyChanged?}}
-    <p>Changed failures:</p>
+    <h3>Run #{{id}} on {{date}}, duration {{duration}} seconds</h3>
+    <p>Version: <span class="ver">{{version}}</span></p>
+    <p>Changed failures since <span class="ver">{{prevVersion}}</span>:</p>
     <table>
       <tr><th>Test case</th><th>Failure reason</th></tr>
       {{#newFailures}}
@@ -33,23 +35,29 @@
       </td></tr>
       {{/newFailures}}
     </table>
-    {{/anyChanged?}}
-    {{^newFailures}}
-    <p>No changes in failed test cases.</p>
-    {{/newFailures}}
     <hr/>
+    {{/anyChanged?}}
+    {{^anyChanged?}}
+    Run #{{id}} on {{date}}, version
+    <span class="ver">{{version}}</span>: No changes since
+    <span class="ver">{{prevVersion}}</span>.<br/>
+    {{/anyChanged?}}
     {{/testRuns}}
     <h2>Test case summary for last test run</h2>
 
     <p>You can also download a <a href="all_cases.tar.bz2">tarball of
 	all the test cases</a>.</p>
 
+    {{#numDistinctFailures}}
+    <p>Triggered <i>{{numDistinctFailures}}</i> distinct failures.</p>
+    {{/numDistinctFailures}}
+
     {{#failures}}
-    <p><h3>{{reason}}</h3></p>
+    <p><b>{{reason}}</b></p>
     <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
-    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{/cases}}</p>
-    <hr/>
-    {{/failures}}
+    <p>{{#cases}} <a class="mo"
+    href="{{url}}">{{shortCase}}</a>{{/cases}}
+    {{#ellipsis}}...{{/ellipsis}}</p> <hr/> {{/failures}}
     {{^failures}}
     <p>No failed test cases.</p>
     {{/failures}}

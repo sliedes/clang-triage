@@ -12,9 +12,22 @@ CREATE TABLE cases (
     sha1 TEXT UNIQUE NOT NULL);
 
 CREATE TABLE case_contents (
-    case_id BIGINT PRIMARY KEY,
-    contents BYTEA NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE);
+    case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE,
+    contents BYTEA NOT NULL);
+
+CREATE TABLE creduced_contents (
+    id BIGSERIAL PRIMARY KEY,
+    contents BYTEA NOT NULL);
+
+CREATE TABLE creduced_cases (
+    original BIGINT NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
+    reduced_id BIGINT REFERENCES creduced_contents(id) ON UPDATE CASCADE,
+    clang_version INTEGER NOT NULL,
+    llvm_version INTEGER NOT NULL,
+    PRIMARY KEY (original, clang_version, llvm_version));
+
+CREATE TABLE creduce_requests (
+    case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE);
 
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
@@ -26,9 +39,10 @@ CREATE TABLE test_runs (
     id BIGSERIAL PRIMARY KEY,
     start_time BIGINT NOT NULL,
     end_time BIGINT NOT NULL,
-    versions TEXT NOT NULL);
+    clang_version INTEGER NOT NULL,
+    llvm_version INTEGER NOT NULL);
 CREATE INDEX test_runs_start_time ON test_runs(start_time);
-CREATE INDEX test_runs_versions ON test_runs(versions);
+CREATE UNIQUE INDEX test_runs_versions ON test_runs(clang_version, llvm_version);
 
 CREATE TABLE result_strings (
     id BIGSERIAL PRIMARY KEY,
@@ -127,11 +141,17 @@ class TriageDb(object):
 
     def _addTestRun(self, versions, start_time, end_time, results):
         'Returns id of test run that can be passed to _testRunFinished().'
+        assert 'clang' in versions, versions
+        assert 'llvm' in versions, versions
+        clang_version = versions['clang']
+        llvm_version = versions['llvm']
         with self.conn:
             with self.conn.cursor() as c:
-                c.execute('INSERT INTO test_runs (start_time, end_time, versions) ' +
-                          'VALUES (%s, %s, %s) RETURNING id',
-                          (start_time, end_time, versions))
+                c.execute(
+                    'INSERT INTO test_runs ' +
+                    '    (start_time, end_time, clang_version, llvm_version) ' +
+                    'VALUES (%s, %s, %s, %s) RETURNING id',
+                    (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)
 
@@ -161,16 +181,74 @@ class TriageDb(object):
                       [(run_id, x[0], x[1]) for x in results])
 
     def getLastRunTimeByVersions(self, versions):
-        '''Returns (start_time, end_time) of the last test run with this version.
+        '''Returns (start_time, end_time) of the test run with these versions.
            If no test has been run with this version, returns None.'''
+        assert 'clang' in versions, versions
+        assert 'llvm' in versions, versions
+        clang_version = versions['clang']
+        llvm_version = versions['llvm']
         with self.conn:
             with self.conn.cursor() as c:
+                # Currently there can (by design) be only one run, hence
+                # the ORDER_BY and LIMIT are redundant.
                 c.execute('SELECT start_time, end_time ' +
                           'FROM test_runs ' +
-                          'WHERE versions=%s ' +
+                          'WHERE clang_version=%s AND llvm_version=%s ' +
                           'ORDER BY start_time ' +
-                          'LIMIT 1', (versions, ))
+                          'LIMIT 1', (clang_version, llvm_version))
                 return c.fetchone()
+
+    def requestCReduces(self, shas):
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.executemany(
+                    'INSERT INTO creduce_requests (case_id) ' +
+                    'SELECT id FROM cases WHERE sha=%s',
+                    [(x,) for x in shas])
+
+    def removeCReduceRequest(self, sha):
+        self.removeCReduceRequests([sha])
+
+    def removeCReduceRequests(self, shas):
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.executemany(
+                    'DELETE FROM creduce_requests ' +
+                    'WHERE case_id IN (SELECT id FROM cases WHERE sha1=%s)',
+                    [(x,) for x in shas])
+
+    def getCReduceWork(self):
+        'Get (sha, content) pair to run through creduce. None if none.'
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute(
+                    'SELECT cases.sha1, case_contents.contents ' +
+                    'FROM creduce_requests, cases, case_contents ' +
+                    'WHERE creduce_requests.case_id = cases.id ' +
+                    '    AND cases.id = case_contents.case_id ' +
+                    '    LIMIT 1')
+                return c.fetchone()
+
+    def addCReduced(self, versions, sha, contents=None):
+        llvm_version = versions['llvm']
+        clang_version = versions['clang']
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute('SELECT id FROM cases WHERE sha1=%s', (sha, ))
+                case_id = c.fetchone()
+                assert case_id, sha
+                case_id = case_id[0]
+                c.execute('DELETE from creduce_requests ' +
+                          'WHERE case_id=%s', (case_id, ))
+                content_id = None
+                if not contents is None:
+                    c.execute('INSERT INTO creduced_contents (contents) ' +
+                              'VALUES (%s) RETURNING id', (contents, ))
+                    content_id = c.fetchone()[0]
+                c.execute('INSERT INTO creduced_cases (original, reduced_id, ' +
+                          '    clang_version, llvm_version) ' +
+                          'VALUES (%s, %s, %s, %s)', (
+                              case_id, content_id, clang_version, llvm_version))
 
     class TestRunContext(object):
         def __init__(self, db, versions):
@@ -183,8 +261,9 @@ class TriageDb(object):
             return self
 
         def __exit__(self, type, value, traceback):
-            self.db._addTestRun(self.versions, self.start_time,
-                                int(time.time()), self.results)
+            self.db._addTestRun(self.versions,
+                                self.start_time, int(time.time()),
+                                self.results)
 
         def addResult(self, sha, result_string):
             self.results.append((sha, result_string))
