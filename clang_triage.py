@@ -2,105 +2,9 @@
 
 import os, sys, subprocess as subp, tempfile, copy, time, string
 from triage_db import TriageDb
+from repository import update_and_build, get_versions
 
-TOP = '/home/sliedes/scratch/build/clang-triage'
-LLVM_SRC = TOP + '/llvm.src'
-BUILD = TOP + '/clang-triage.ninja'
-TEST_CASE_DIR = '/home/sliedes/scratch/afl/cases.minimized'
-
-NINJA_PARAMS = ['-j8']
-
-TIMEOUT_CMD = ['timeout', '-k', '4', '4']
-
-CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
-                '-fno-crash-diagnostics', '-xc++', '-c',
-                '-o' '/dev/null', '-']
-
-PROJECTS = {'llvm' : LLVM_SRC, 'clang' : LLVM_SRC + '/tools/clang'}
-
-CLANG_BINARY = BUILD + '/bin/clang'
-
-CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'
-
-MIN_GIT_CHECKOUT_INTERVAL = 10*60 # seconds
-CREDUCE_TIMEOUT = 4*60
-
-class CommitInfo(object):
-    def __git(self, fmt):
-        CMD = ['git', 'show', '-s', '--format='+fmt, self.name]
-        out = subp.check_output(CMD, cwd=self.path).decode('utf-8')
-        assert out.endswith('\n')
-        return out[:-1]
-
-    def __init__(self, path, name = None):
-        self.path = path
-
-        if not name:
-            name = 'HEAD'
-
-        self.name = name
-        self.commit_id = self.__git('%H')
-        self.author = self.__git('%an <%ae>')
-        self.date = self.__git('%ad')
-        self.date_ts = int(self.__git('%at'))
-        self.short = self.__git('%s')
-        self.body = self.__git('%B')
-
-        self.svn_id = None
-        for line in self.body.splitlines():
-            if line.startswith('git-svn-id: '):
-                self.svn_id = line.split(' ', 1)[1]
-
-        self.svn_revision = None
-        if self.svn_id:
-            url, uuid = self.svn_id.split(' ')
-            self.svn_revision = int(url.split('@')[-1])
-
-    def __str__(self):
-        return 'CommitInfo(commit_id={commit_id}, short="{short}")'.format(
-            commit_id = self.commit_id, short = self.short)
-
-
-def git_pull(path):
-    try:
-        subp.check_output(['git', 'pull'], cwd=path)
-    except subp.CalledProcessError as e:
-        print('git pull failed with exit code %d.' % e.returncode,
-              file=sys.stderr)
-        print('Output was:\n' + e.output.decode('utf-8'), file=sys.stderr)
-        raise
-
-
-LAST_UPDATED = 0
-
-def update_all(db, versions):
-    global LAST_UPDATED
-    # run creduce or sleep until we're allowed to update again
-    while True:
-        elapsed = time.time() - LAST_UPDATED
-        left = MIN_GIT_CHECKOUT_INTERVAL - elapsed
-        if left <= 0:
-            break
-        print('Still {:.1f} seconds to wait before git pull.'.format(
-            left), file=sys.stderr)
-        if not creduce_worker_one_iter(db, versions):
-            print('No creduce work to do, sleeping...', file=sys.stderr)
-            time.sleep(left)
-    for proj, path in PROJECTS.items():
-        git_pull(path)
-    LAST_UPDATED = time.time()
-
-def get_versions():
-    'Returns a dict of svn revisions.'
-    out = {}
-    for proj, path in PROJECTS.items():
-        info = CommitInfo(path)
-        assert info.svn_revision, info
-        out[proj] = info.svn_revision
-    return out
-
-def build():
-    subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
+from config import *
 
 def inputs():
     files = [x for x in os.listdir(TEST_CASE_DIR) if x.endswith('.cpp.lz')]
@@ -111,6 +15,17 @@ def inputs():
             data = subp.check_output(['lzip', '-d'], stdin=f)
         yield sha, data
 
+def save_data(prefix, data):
+    t = int(time.time())
+    for i in range(-1,1000):
+        fname = os.path.join(REPORT_SAVE_DIR, '{}-{}'.format(
+            prefix, t))
+        if i!= -1:
+            fname += '.' + str(i)
+        if not os.path.exists(fname):
+            with open(fname, 'wb') as f:
+                f.write(data)
+                return
 
 def check_for_clang_crash(output, retval):
     # timeout -> return value 124 (per timeout manual)
@@ -122,11 +37,11 @@ def check_for_clang_crash(output, retval):
     if a != -1:
         return output[a:].split(b'\n', 1)[0].decode('utf-8')
     if output.find(b'Stack dump:') != -1:
+        save_data('stack-dump', output)
         return 'Stack dump found'
     if retval > 128:
         return 'Killed by signal %d' % (retval-128)
     return None
-
 
 def env_with_tmpdir(path):
     env = copy.copy(os.environ)
@@ -135,7 +50,6 @@ def env_with_tmpdir(path):
     env['TEMP'] = path
     return env
 
-
 def test_input(data, extra_params=[]):
     CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
     p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
@@ -143,15 +57,6 @@ def test_input(data, extra_params=[]):
     stdout = p.communicate(data)[0]
     retval = p.returncode
     return check_for_clang_crash(stdout, retval)
-
-
-def update_and_build(db):
-    versions = get_versions()
-    print('Version: ' + str(versions))
-    update_all(db, versions)
-    print('Version: ' + str(get_versions()))
-    build()
-
 
 def run_creduce(data):
     reason = test_input(data)
@@ -238,7 +143,9 @@ def creduce_worker_one_iter(db, versions):
     return True
 
 def update_and_check_if_should_run(db):
-    update_and_build(db) # sleeps or runs creduce
+    versions = get_versions()
+    idle_func = lambda: creduce_worker_one_iter(db, versions)
+    update_and_build(idle_func) # sleeps or runs creduce
     versions = get_versions()
 
     lastRun = db.getLastRunTimeByVersions(versions)
@@ -249,9 +156,7 @@ def update_and_check_if_should_run(db):
         return False
     else:
         print('Version previously unseen. Running test...', file=sys.stderr)
-
     return True
-
 
 def test_iter(start_from_current=False):
     '''Build new version if available and execute tests.
