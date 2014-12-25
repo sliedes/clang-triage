@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-import os, sys, subprocess as subp, tempfile, copy, time, string
+import os, sys, subprocess as subp, time
 from triage_db import TriageDb
 from repository import update_and_build, get_versions
+from run_clang import test_input
+from run_creduce import reduce_one
 
-from config import *
+from config import TEST_CASE_DIR
 
 def inputs():
     files = [x for x in os.listdir(TEST_CASE_DIR) if x.endswith('.cpp.lz')]
@@ -15,130 +17,21 @@ def inputs():
             data = subp.check_output(['lzip', '-d'], stdin=f)
         yield sha, data
 
-def save_data(prefix, data):
-    t = int(time.time())
-    for i in range(-1,1000):
-        fname = os.path.join(REPORT_SAVE_DIR, '{}-{}'.format(
-            prefix, t))
-        if i!= -1:
-            fname += '.' + str(i)
-        if not os.path.exists(fname):
-            with open(fname, 'wb') as f:
-                f.write(data)
-                return
-
-def check_for_clang_crash(output, retval):
-    # timeout -> return value 124 (per timeout manual)
-    if output.find(b'Segmentation fault') != -1:
-        return 'SEGV'
-    a = output.find(b'Assertion ')
-    if a == -1:
-        a = output.find(b'UNREACHABLE ')
-    if a != -1:
-        return output[a:].split(b'\n', 1)[0].decode('utf-8')
-    if output.find(b'Stack dump:') != -1:
-        save_data('stack-dump', output)
-        return 'Stack dump found'
-    if retval > 128:
-        return 'Killed by signal %d' % (retval-128)
-    return None
-
-def env_with_tmpdir(path):
-    env = copy.copy(os.environ)
-    env['TMPDIR'] = path
-    env['TMP'] = path
-    env['TEMP'] = path
-    return env
-
-def test_input(data, extra_params=[]):
-    CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
-    p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
-                   stderr=subp.STDOUT, cwd='/')
-    stdout = p.communicate(data)[0]
-    retval = p.returncode
-    return check_for_clang_crash(stdout, retval)
-
-def run_creduce(data):
-    reason = test_input(data)
-    assert reason, 'Cannot run_creduce() on a non-crashing input.'
-    assert (os.path.isfile(CREDUCE_PROPERTY_SCRIPT) and
-            os.access(CREDUCE_PROPERTY_SCRIPT, os.X_OK)), (
-        'No %s in cwd %s (or not executable).' % (CREDUCE_PROPERTY_SCRIPT, os.getcwd()))
-    with tempfile.TemporaryDirectory(prefix='clang_triage') as creduce_dir:
-        # creduce may leave files, so point TMPDIR below our creduce
-        # temp dir
-        env_tmpdir = os.path.join(creduce_dir, 'tmp')
-        os.mkdir(env_tmpdir)
-        reason_fname = os.path.join(creduce_dir, 'crash_reason.dat')
-        cpp_fname = os.path.join(creduce_dir, 'buggy.cpp')
-        prop_script = os.path.abspath(CREDUCE_PROPERTY_SCRIPT)
-        with open(reason_fname, 'w') as f:
-            f.write(reason)
-        with open(cpp_fname, 'wb') as f:
-            f.write(data)
-
-        env = env_with_tmpdir(env_tmpdir)
-        env['CLANG_TRIAGE_TMP'] = creduce_dir
-        try:
-            # creduce is buggy, so execute with a timeout
-            subp.check_call(['timeout', str(CREDUCE_TIMEOUT),
-                             'creduce', prop_script, 'buggy.cpp'],
-                            env=env, cwd=creduce_dir,
-                            stdout=subp.DEVNULL, stderr=subp.DEVNULL)
-        except subp.CalledProcessError as e:
-            print('CReduce failed with exit code ' + str(e.returncode),
-                  file=sys.stderr)
-            return None
-        with open(cpp_fname, 'rb') as f:
-            reduced = f.read()
-    reduced_reason = test_input(reduced)
-    if reason != reduced_reason:
-        print('CReduced case produces different result: {} != {}'.format(
-            reduced_reason, reason), file=sys.stderr)
-        return None
-    return reduced
-
-PRINTABLE = string.printable.encode('ascii')
-
-def try_remove_nonprintables(contents, reason):
-    reduced = b''
-    for i in range(len(contents)):
-        if not contents[i] in PRINTABLE:
-            if i != len(contents)-1:
-                tail = contents[i+1:]
-            else:
-                tail = b''
-            for replacement in [b'', b' ', b'_']:
-                r = test_input(reduced + replacement + tail)
-                if r == reason:
-                    reduced += replacement
-                    break
-            else:
-                # failed to remove
-                reduced += contents[i:i+1]
-        else:
-            reduced += contents[i:i+1]
-    assert test_input(contents) == test_input(reduced)
-    return reduced
-
 def creduce_worker_one_iter(db, versions):
     work = db.getCReduceWork()
     if not work:
         return None
     sha, contents = work
-    print('Running creduce for ' + sha + '...', file=sys.stderr)
+    print('Running creduce for ' + sha + '... ', file=sys.stderr, end='')
+    sys.stderr.flush()
     reason = test_input(contents)
     if not reason:
-        print('Error: Input does not crash.', file=sys.stderr)
+        print('Input does not crash.', file=sys.stderr)
         db.removeCReduceRequest(sha)
         return True
-    reduced = run_creduce(contents)
+    reduced = reduce_one(contents, reason)
     if not reduced is None:
-        #print('Got reduced case of {} bytes, trying to further remove nonprintables...'.format(
-        #    len(reduced)))
-        reduced_old = reduced
-        reduced = try_remove_nonprintables(reduced, reason)
-        #print('Removed {} nonprintables.'.format(len(reduced_old)-len(reduced)))
+        print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)))
     db.addCReduced(versions, sha, reduced)
     return True
 

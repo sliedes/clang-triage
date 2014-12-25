@@ -1,6 +1,7 @@
 from config import PROJECTS, MIN_GIT_CHECKOUT_INTERVAL, NINJA_PARAMS, BUILD
 import sys, time
 import subprocess as subp
+from utils import const
 
 class CommitInfo(object):
     def __git(self, fmt):
@@ -48,10 +49,7 @@ def git_pull(path):
 
 LAST_UPDATED = 0
 
-def _const_false():
-    return False
-
-def update_all(versions, idle_func=_const_false):
+def update_all(versions, idle_func=const(False)):
     '''Update repositories if interval has passed. If not, call idle_func
     until it has. If idle_func returns False, just sleep.'''
     global LAST_UPDATED
@@ -82,7 +80,7 @@ def get_versions():
 def build():
     subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
 
-def update_and_build(idle_func=_const_false):
+def update_and_build(idle_func=const(False)):
     versions = get_versions()
     print('Version: ' + str(versions))
     update_all(versions, idle_func)
