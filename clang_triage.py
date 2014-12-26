@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, sys, subprocess as subp, time
-from triage_db import TriageDb
+from triage_db import TriageDb, CReduceResult
 from repository import update_and_build, get_versions
 from run_clang import test_input
 from run_creduce import reduce_one
@@ -16,12 +16,14 @@ def creduce_worker_one_iter(db, versions):
     reason = test_input(contents)
     if not reason:
         print('Input does not crash.', file=sys.stderr)
-        db.removeCReduceRequest(sha)
+        db.addCReduced(versions, sha, CReduceResult.no_crash)
         return True
     reduced = reduce_one(contents, reason)
     if not reduced is None:
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)))
-    db.addCReduced(versions, sha, reduced)
+        db.addCReduced(versions, sha, CReduceResult.ok, reduced)
+    else:
+        db.addCReduced(versions, sha, CReduceResult.failed)
     return True
 
 def update_and_check_if_should_run(db):

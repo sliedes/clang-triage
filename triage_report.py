@@ -13,17 +13,9 @@ MAX_SHOW_CASES = 20
 
 def fetch_failures(cursor, run_id):
     c = cursor
-    c.execute('SELECT sha1, str, cr.contents ' +
-              'FROM (SELECT cases.id, cases.sha1, result_strings.str ' +
-              '        FROM result_strings, results, cases ' +
-              '        WHERE results.case_id=cases.id AND results.test_run=%s ' +
-              '        AND result_strings.id=results.result) AS cas ' +
-              '    LEFT OUTER JOIN (' +
-              '        SELECT DISTINCT ON (original) original, contents ' +
-              '        FROM creduced_cases, creduced_contents ' +
-              '        WHERE creduced_id = creduced_cases.id) cr ' +
-              '    ON (cr.original = cas.id), case_contents ' +
-              'WHERE cas.id=case_contents.case_id', (run_id, ))
+    c.execute('SELECT sha1, str, reduced ' +
+              'FROM failures_with_reduced_view ' +
+              'WHERE test_run=%s', (run_id, ))
     results = c.fetchall()
     fails_dict = dict([(x[0], x[1]) for x in results])
     reduced_dict = dict([(x[0], sha1(x[2]).hexdigest())
@@ -99,9 +91,6 @@ def main():
                          if (not old_fails is None
                              and x[0] in old_fails
                              and old_fails[x[0]] != x[1])]
-                #print((id_, fails), file=sys.stderr)
-                #print(fails_dict['691c2999aed7b4b2ef5389b3775497c198a11a87'],
-                #      file=sys.stderr)
                 old_fails = fails_dict
                 version = 'clang {}, llvm {}'.format(clang_ver, llvm_ver)
                 d = {'id': id_, 'date': time.asctime(time.gmtime(start_time)),
@@ -122,7 +111,6 @@ def main():
     last_run_completed = test_runs[0]['endTime']
 
     # only show test runs with changed results, except for the newest one
-    #test_runs[1:] = [x for x in test_runs[1:] if x['newFailures']]
 
     context = {'testRuns': test_runs,
                'numRunsCompleted': num_runs_completed,

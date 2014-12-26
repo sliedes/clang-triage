@@ -2,8 +2,14 @@
 
 import psycopg2 as pg
 import sys, os, time, itertools
+from enum import Enum
 
 from config import DB_NAME, POPULATE_FROM
+
+class CReduceResult(Enum):
+    ok = 1
+    failed = 2
+    no_crash = 3
 
 _CREATE_TABLES_SQL = '''
 CREATE TABLE cases (
@@ -18,15 +24,15 @@ CREATE TABLE creduced_contents (
     creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
     contents BYTEA NOT NULL);
 
+CREATE TYPE creduce_result AS ENUM ('ok', 'failed', 'no_crash');
+
 CREATE TABLE creduced_cases (
     id BIGSERIAL PRIMARY KEY,
     original BIGINT NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
     clang_version INTEGER NOT NULL,
-    llvm_version INTEGER NOT NULL);
+    llvm_version INTEGER NOT NULL,
+    result creduce_result NOT NULL);
 CREATE UNIQUE INDEX creduced_cases_original_versions_unique ON creduced_cases (original, clang_version, llvm_version);
-
-CREATE TABLE creduce_requests (
-    case_id BIGINT PRIMARY KEY REFERENCES case_contents(case_id) ON UPDATE CASCADE);
 
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
@@ -59,6 +65,33 @@ CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);
 CREATE UNIQUE INDEX results_case_id_test_run ON results(case_id, test_run);
+
+CREATE VIEW case_view AS
+    SELECT id, sha1, contents
+    FROM cases, case_contents
+    WHERE cases.id = case_contents.case_id;
+
+CREATE VIEW unreduced_cases_view AS
+    SELECT sha1, contents
+    FROM case_view AS cv
+    WHERE NOT EXISTS (
+        SELECT * FROM creduced_cases AS red
+	WHERE red.original = cv.id);
+
+CREATE VIEW failures_view AS
+    SELECT test_run, cases.id, sha1, str
+    FROM result_strings AS res, results, cases
+    WHERE results.case_id = cases.id
+        AND results.result = res.id;
+
+CREATE VIEW failures_with_reduced_view AS
+    SELECT test_run, id, sha1, str, case_contents.contents AS reduced
+    FROM failures_view LEFT OUTER JOIN (
+	SELECT DISTINCT ON (original) original, contents
+	FROM creduced_cases AS cas, creduced_contents AS con
+	WHERE con.creduced_id = cas.id) AS cr
+    ON (cr.original = id), case_contents
+    WHERE id = case_contents.case_id;
 '''.strip()
 
 def readFile(path):
@@ -130,10 +163,9 @@ class TriageDb(object):
         'Iterate through (sha1, contents) pairs.'
         with self.conn:
             c = self.conn.cursor()
-            c.execute('SELECT cases.sha1, case_contents.contents ' +
-                      'FROM cases, case_contents, case_sizes '
-                      'WHERE case_contents.case_id = cases.id ' +
-                      '      AND case_sizes.case_id = cases.id ' +
+            c.execute('SELECT cc.sha1, cc.contents ' +
+                      'FROM case_view AS cc, case_sizes '
+                      'WHERE case_sizes.case_id = cc.id ' +
                       'ORDER BY case_sizes.size')
             return c
 
@@ -146,7 +178,7 @@ class TriageDb(object):
     def getNumberOfCases(self):
         with self.conn:
             with self.conn.cursor() as c:
-                c.execute('SELECT count(*) from cases')
+                c.execute('SELECT count(*) from case_contents')
                 return c.fetchone()[0]
 
     def _addTestRun(self, versions, start_time, end_time, results):
@@ -202,38 +234,22 @@ class TriageDb(object):
                           'LIMIT 1', (clang_version, llvm_version))
                 return c.fetchone()
 
-    def requestCReduces(self, shas):
-        with self.conn:
-            with self.conn.cursor() as c:
-                c.executemany(
-                    'INSERT INTO creduce_requests (case_id) ' +
-                    'SELECT id FROM cases WHERE sha=%s',
-                    [(x,) for x in shas])
-
-    def removeCReduceRequest(self, sha):
-        self.removeCReduceRequests([sha])
-
-    def removeCReduceRequests(self, shas):
-        with self.conn:
-            with self.conn.cursor() as c:
-                c.executemany(
-                    'DELETE FROM creduce_requests ' +
-                    'WHERE case_id IN (SELECT id FROM cases WHERE sha1=%s)',
-                    [(x,) for x in shas])
-
     def getCReduceWork(self):
         'Get (sha, content) pair to run through creduce. None if none.'
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(
-                    'SELECT cases.sha1, case_contents.contents ' +
-                    'FROM creduce_requests, cases, case_contents ' +
-                    'WHERE creduce_requests.case_id = cases.id ' +
-                    '    AND cases.id = case_contents.case_id ' +
-                    '    LIMIT 1')
+                    'SELECT sha1, contents FROM unreduced_cases_view ' +
+                    'LIMIT 1')
                 return c.fetchone()
 
-    def addCReduced(self, versions, sha, contents=None):
+    def addCReduced(self, versions, sha, result, contents=None):
+        if result == CReduceResult.ok:
+            assert contents, 'Result OK but no contents?'
+        else:
+            assert (result == CReduceResult.failed or
+                    result == CReduceResult.no_crash), result
+            assert contents is None
         llvm_version = versions['llvm']
         clang_version = versions['clang']
         with self.conn:
@@ -242,13 +258,12 @@ class TriageDb(object):
                 case_id = c.fetchone()
                 assert case_id, sha
                 case_id = case_id[0]
-                c.execute('DELETE from creduce_requests ' +
-                          'WHERE case_id=%s', (case_id, ))
                 content_id = None
                 c.execute('INSERT INTO creduced_cases (original, ' +
-                          '    clang_version, llvm_version) ' +
-                          'VALUES (%s, %s, %s) RETURNING id', (
-                              case_id, clang_version, llvm_version))
+                          '    clang_version, llvm_version, result) ' +
+                          'VALUES (%s, %s, %s, %s) RETURNING id', (
+                              case_id, clang_version, llvm_version,
+                              result.name))
                 cr_id = c.fetchone()[0]
                 if not contents is None:
                     c.execute('INSERT INTO creduced_contents (creduced_id, contents) ' +
