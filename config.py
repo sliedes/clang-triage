@@ -20,3 +20,6 @@ MIN_GIT_CHECKOUT_INTERVAL = 10*60 # seconds
 CREDUCE_TIMEOUT = 4*60
 
 REPORT_SAVE_DIR = 'saved'
+
+DB_NAME = 'clang_triage'
+POPULATE_FROM = '/home/sliedes/scratch/afl/cases.minimized'

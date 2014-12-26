@@ -21,13 +21,17 @@
     <h2>Changes between test runs</h2>
     {{#testRuns}}
     {{#anyChanged?}}
-    <h3>Run #{{id}} on {{date}}, duration {{duration}} seconds</h3>
+    <h3>Run #{{id}} on {{date}}, {{numDistinctFailures}} distinct crashes</h3>
     <p>Version: <span class="ver">{{version}}</span></p>
     <p>Changed failures since <span class="ver">{{prevVersion}}</span>:</p>
     <table>
       <tr><th>Test case</th><th>Failure reason</th></tr>
       {{#newFailures}}
-      <tr><td><a href="{{url}}">{{shortCase}}</a></td><td>
+      <tr><td><a href="{{url}}">{{shortCase}}</a>
+	  {{#haveReduced}}
+	  <br/><a href="{{reducedUrl}}"><small>(reduced)</small></a>
+	  {{/haveReduced}}
+	</td><td>
 	  <table style="border: 0">
 	    <tr><td>New:</td><td>{{reason}}</td></tr>
 	    <tr><td>Was:</td><td>{{oldReason}}</td></tr>
@@ -55,8 +59,9 @@
     {{#failures}}
     <p><b>{{reason}}</b></p>
     <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
-    <p>{{#cases}} <a class="mo"
-    href="{{url}}">{{shortCase}}</a>{{/cases}}
+    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{#haveReduced}}<a href="{{reducedUrl}}">
+	<small>(reduced)</small></a>{{/haveReduced}}{{^isLast}}, {{/isLast}}
+      {{/cases}}
     {{#ellipsis}}...{{/ellipsis}}</p> <hr/> {{/failures}}
     {{^failures}}
     <p>No failed test cases.</p>

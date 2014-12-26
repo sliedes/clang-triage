@@ -3,8 +3,7 @@
 import psycopg2 as pg
 import sys, os, time, itertools
 
-DB_NAME = 'clang_triage'
-POPULATE_FROM = '/home/sliedes/scratch/afl/cases.minimized'
+from config import DB_NAME, POPULATE_FROM
 
 _CREATE_TABLES_SQL = '''
 CREATE TABLE cases (
@@ -16,18 +15,18 @@ CREATE TABLE case_contents (
     contents BYTEA NOT NULL);
 
 CREATE TABLE creduced_contents (
-    id BIGSERIAL PRIMARY KEY,
+    creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
     contents BYTEA NOT NULL);
 
 CREATE TABLE creduced_cases (
+    id BIGSERIAL PRIMARY KEY,
     original BIGINT NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
-    reduced_id BIGINT REFERENCES creduced_contents(id) ON UPDATE CASCADE,
     clang_version INTEGER NOT NULL,
-    llvm_version INTEGER NOT NULL,
-    PRIMARY KEY (original, clang_version, llvm_version));
+    llvm_version INTEGER NOT NULL);
+CREATE UNIQUE INDEX creduced_cases_original_versions_unique ON creduced_cases (original, clang_version, llvm_version);
 
 CREATE TABLE creduce_requests (
-    case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE);
+    case_id BIGINT PRIMARY KEY REFERENCES case_contents(case_id) ON UPDATE CASCADE);
 
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
@@ -94,20 +93,25 @@ class TriageDb(object):
                     self._addCaseContents(c, [(sha, contents)])
 
     def _addCaseNames(self, cursor, casenames):
-        cursor.executemany('INSERT INTO cases (sha1) VALUES (%s)',
-                           ((x,) for x in casenames))
+        cursor.executemany('INSERT INTO cases (sha1) '
+                           'SELECT %s WHERE NOT EXISTS (' +
+                           '    SELECT 1 FROM cases WHERE sha1=%s)',
+                           ((x, x) for x in casenames))
 
     def _addCaseContents(self, cursor, cases):
         cursor.executemany(
             'INSERT INTO case_contents (case_id, contents) ' +
-            '    SELECT id, %s ' +
-            '    FROM cases ' +
-            '    WHERE sha1=%s',
+            '    (SELECT id, %s ' +
+            '     FROM cases ' +
+            '     WHERE sha1=%s AND NOT EXISTS (' +
+            '         SELECT 1 FROM case_contents WHERE case_id=id))',
             ((x[1], x[0]) for x in cases))
         cursor.execute(
             'INSERT INTO case_sizes (case_id, size) '  +
-            '    SELECT case_id, length(contents) ' +
-            '    FROM case_contents')
+            '    (SELECT case_id, length(contents) ' +
+            '     FROM case_contents WHERE NOT EXISTS (' +
+            '         SELECT 1 FROM case_sizes ' +
+            '         WHERE case_sizes.case_id=case_contents.case_id))')
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
@@ -133,6 +137,12 @@ class TriageDb(object):
                       'ORDER BY case_sizes.size')
             return c
 
+    def iterateDistinctReduced(self):
+        with self.conn:
+            c = self.conn.cursor()
+            c.execute('SELECT DISTINCT contents FROM creduced_contents')
+            return (x[0] for x in c)
+
     def getNumberOfCases(self):
         with self.conn:
             with self.conn.cursor() as c:
@@ -154,12 +164,6 @@ class TriageDb(object):
                     (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)
-
-    #def _testRunFinished(self, run_id):
-    #    c = self.conn.cursor()
-    #    with self.conn:
-    #        c.execute('UPDATE test_runs SET end_time = %s ' +
-    #                  'WHERE id = %s', (int(time.time()), run_id))
 
     def testRun(self, versions):
         'A context manager for test runs.'
@@ -241,14 +245,14 @@ class TriageDb(object):
                 c.execute('DELETE from creduce_requests ' +
                           'WHERE case_id=%s', (case_id, ))
                 content_id = None
-                if not contents is None:
-                    c.execute('INSERT INTO creduced_contents (contents) ' +
-                              'VALUES (%s) RETURNING id', (contents, ))
-                    content_id = c.fetchone()[0]
-                c.execute('INSERT INTO creduced_cases (original, reduced_id, ' +
+                c.execute('INSERT INTO creduced_cases (original, ' +
                           '    clang_version, llvm_version) ' +
-                          'VALUES (%s, %s, %s, %s)', (
-                              case_id, content_id, clang_version, llvm_version))
+                          'VALUES (%s, %s, %s) RETURNING id', (
+                              case_id, clang_version, llvm_version))
+                cr_id = c.fetchone()[0]
+                if not contents is None:
+                    c.execute('INSERT INTO creduced_contents (creduced_id, contents) ' +
+                              'VALUES (%s, %s)', (cr_id, contents))
 
     class TestRunContext(object):
         def __init__(self, db, versions):
@@ -261,9 +265,11 @@ class TriageDb(object):
             return self
 
         def __exit__(self, type, value, traceback):
-            self.db._addTestRun(self.versions,
-                                self.start_time, int(time.time()),
-                                self.results)
+            # We actually don't want to commit on an exception
+            if not value:
+                self.db._addTestRun(self.versions,
+                                    self.start_time, int(time.time()),
+                                    self.results)
 
         def addResult(self, sha, result_string):
             self.results.append((sha, result_string))
@@ -275,7 +281,7 @@ def test(db):
 def main():
     db = TriageDb()
     #db.createSchema()
-    #db.populateCases(POPULATE_FROM)
+    db.populateCases(POPULATE_FROM)
 
     test(db)
 

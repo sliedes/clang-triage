@@ -1,6 +1,6 @@
 from config import REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS
 import subprocess as subp
-import os
+import os, time
 
 def save_data(prefix, data):
     t = int(time.time())
@@ -18,9 +18,13 @@ def check_for_clang_crash(output, retval):
     # timeout -> return value 124 (per timeout manual)
     if output.find(b'Segmentation fault') != -1:
         return 'SEGV'
+    elif output.find(b'Illegal instruction') != -1:
+        return 'Illegal instruction'
     a = output.find(b'Assertion ')
     if a == -1:
         a = output.find(b'UNREACHABLE ')
+    if a == -1:
+        a = output.find(b'terminate called after throwing an instance')
     if a != -1:
         return output[a:].split(b'\n', 1)[0].decode('utf-8')
     if output.find(b'Stack dump:') != -1:

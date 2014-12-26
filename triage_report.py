@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from triage_db import DB_NAME
 import psycopg2 as pg
 import pystache, time, sys
+from hashlib import sha1
+
+from config import DB_NAME
 
 DBNAME = 'clang_triage'
 
@@ -11,18 +13,33 @@ MAX_SHOW_CASES = 20
 
 def fetch_failures(cursor, run_id):
     c = cursor
-    c.execute('SELECT cases.sha1, result_strings.str ' +
-              'FROM cases, result_strings, results ' +
-              'WHERE results.case_id=cases.id AND results.test_run=%s ' +
-              '    AND result_strings.id=results.result ', (run_id, ))
-    return dict(c.fetchall())
+    c.execute('SELECT sha1, str, contents ' +
+              'FROM (SELECT cases.id, cases.sha1, result_strings.str ' +
+              '        FROM result_strings, results, cases ' +
+              '        WHERE results.case_id=cases.id AND results.test_run=%s ' +
+              '        AND result_strings.id=results.result) AS cas ' +
+              '    LEFT OUTER JOIN (' +
+              '        SELECT DISTINCT ON (original) original, contents ' +
+              '        FROM creduced_cases, creduced_contents ' +
+              '        WHERE creduced_id = creduced_cases.id) cc ' +
+              '    ON (cc.original = cas.id)', (run_id, ))
+    results = c.fetchall()
+    fails_dict = dict([(x[0], x[1]) for x in results])
+    reduced_dict = dict([(x[0], sha1(x[2]).hexdigest())
+                         for x in results if x[2]])
+    return fails_dict, reduced_dict
 
-def case_dict(sha):
-    return {'case': sha, 'shortCase': sha[0:6],
-            'url': 'sha/{}/{}/{}.cpp'.format(sha[0], sha[1], sha)}
+def case_dict(sha, reduced=None):
+    d = {'case': sha, 'shortCase': sha[0:6],
+         'url': 'sha/{}/{}/{}.cpp'.format(sha[0], sha[1], sha),
+         'haveReduced': bool(reduced), 'isLast': False}
+    if reduced:
+        d['reducedUrl'] = 'cr/{}/{}/{}.cpp'.format(
+            reduced[0], reduced[1], reduced)
+    return d
 
-def failure_dict(sha, reason, old_reason):
-    d = case_dict(sha)
+def failure_dict(sha, reason, old_reason, reduced=None):
+    d = case_dict(sha, reduced)
     d.update({'reason': reason, 'oldReason': old_reason})
     return d
 
@@ -40,9 +57,12 @@ def main():
             old_fails = None
             prev_version = None
             for id_, start_time, end_time, clang_ver, llvm_ver in res:
-                fails_dict = fetch_failures(c, id_)
+                fails_dict, reduced_dict = fetch_failures(c, id_)
+                all_reasons = set(fails_dict.values())
+                all_reasons -= set(['OK'])
                 # changed failures
-                fails = [failure_dict(x[0], x[1], old_fails[x[0]])
+                fails = [failure_dict(x[0], x[1], old_fails[x[0]],
+                                      reduced_dict.get(x[0]))
                          for x in sorted(fails_dict.items())
                          if (not old_fails is None
                              and x[0] in old_fails
@@ -56,13 +76,14 @@ def main():
                      'duration': '{:d}'.format(end_time-start_time),
                      'version': version, 'prevVersion': prev_version,
                      'newFailures': fails,
+                     'numDistinctFailures': len(all_reasons),
                      'endTime': time.asctime(time.gmtime(end_time)),
                      'anyChanged?': len(fails)>0}
                 prev_version = version
                 test_runs.append(d)
 
             test_runs = test_runs[::-1]
-            c.execute('SELECT COUNT(*) FROM cases')
+            c.execute('SELECT COUNT(*) FROM case_contents')
             num_inputs = c.fetchone()[0]
 
     num_runs_completed = len(test_runs)
@@ -86,19 +107,24 @@ def main():
     if 'OK' in failures:
         del failures['OK']
 
-    # sort cases by sha1
-    failures = [(x[0], sorted(x[1])) for x in failures.items()]
+    # sort cases by whether reduced, secondarily by sha1
+    failures = [(x[0], sorted(x[1],
+                              key=lambda z: (not z in reduced_dict, z)))
+                for x in failures.items()]
     # sort by number of test cases triggering the crash
     failures.sort(key=lambda x: len(x[1]), reverse=True)
 
     failures = [{'reason': x[0],
-                 'cases': [case_dict(y) for y in x[1][:MAX_SHOW_CASES]],
+                 'cases': [case_dict(y, reduced_dict.get(y))
+                           for y in x[1][:MAX_SHOW_CASES]],
                  'numCases': len(x[1]),
                  'plural': len(x[1]) != 1,
                  'ellipsis': len(x[1]) > MAX_SHOW_CASES}
                 for x in failures]
-    context['failures'] = failures
+    for f in failures:
+        f['cases'][-1]['isLast'] = True
 
+    context['failures'] = failures
     context['numDistinctFailures'] = len(failures)
 
     print(pystache.render(TEMPLATE, context))
