@@ -6,17 +6,6 @@ from repository import update_and_build, get_versions
 from run_clang import test_input
 from run_creduce import reduce_one
 
-from config import TEST_CASE_DIR
-
-def inputs():
-    files = [x for x in os.listdir(TEST_CASE_DIR) if x.endswith('.cpp.lz')]
-    files.sort()
-    for fname in files:
-        sha = fname.rsplit('.', 2)[0]
-        with open(os.path.join(TEST_CASE_DIR, fname)) as f:
-            data = subp.check_output(['lzip', '-d'], stdin=f)
-        yield sha, data
-
 def creduce_worker_one_iter(db, versions):
     work = db.getCReduceWork()
     if not work:

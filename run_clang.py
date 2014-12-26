@@ -1,11 +1,13 @@
-from config import REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS
+from config import MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS
 import subprocess as subp
 import os, time
 
 def save_data(prefix, data):
     t = int(time.time())
+    if not os.path.isdir(MISC_REPORT_SAVE_DIR):
+        os.path.mkdir(MISC_REPORT_SAVE_DIR)
     for i in range(-1,1000):
-        fname = os.path.join(REPORT_SAVE_DIR, '{}-{}'.format(
+        fname = os.path.join(MISC_REPORT_SAVE_DIR, '{}-{}'.format(
             prefix, t))
         if i!= -1:
             fname += '.' + str(i)

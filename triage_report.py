@@ -12,7 +12,6 @@ DBNAME = 'clang_triage'
 MAX_SHOW_CASES = 20
 
 def fetch_failures(cursor, run_id):
-    'Returns sha, str, reduced_contents (which may be None)'
     c = cursor
     c.execute('SELECT sha1, str, cr.contents ' +
               'FROM (SELECT cases.id, cases.sha1, result_strings.str ' +
@@ -29,7 +28,9 @@ def fetch_failures(cursor, run_id):
     fails_dict = dict([(x[0], x[1]) for x in results])
     reduced_dict = dict([(x[0], sha1(x[2]).hexdigest())
                          for x in results if x[2]])
-    return fails_dict, reduced_dict
+    reduced_sizes = dict([(x[0], len(x[2]))
+                          for x in results if x[2]])
+    return fails_dict, reduced_dict, reduced_sizes
 
 def case_dict(sha, reduced=None):
     d = {'case': sha, 'shortCase': sha[0:6],
@@ -45,6 +46,35 @@ def failure_dict(sha, reason, old_reason, reduced=None):
     d.update({'reason': reason, 'oldReason': old_reason})
     return d
 
+def split_by(pred, xs):
+    a = ([], [])
+
+    for x in xs:
+        a[bool(pred(x))].append(x)
+
+    return a
+
+def sort_cases(cases, reduced_dict, reduced_sizes):
+    not_reduced, reduced = split_by(lambda x: x in reduced_dict, cases)
+    not_reduced.sort()
+
+    # sort reduced by size, sha
+    reduced.sort(key=lambda x: (reduced_sizes[x], x))
+
+    # move last cases which move to something already seen earlier
+    unique_reduced = []
+    duplicate_reduced = []
+    seen = set()
+    for x in reduced:
+        red = reduced_dict[x]
+        if red in seen:
+            duplicate_reduced.append(x)
+        else:
+            seen.add(red)
+            unique_reduced.append(x)
+
+    return unique_reduced + not_reduced + duplicate_reduced
+
 def main():
     with open('triage_report.pystache.xhtml') as f:
         TEMPLATE = pystache.parse(f.read())
@@ -59,7 +89,7 @@ def main():
             old_fails = None
             prev_version = None
             for id_, start_time, end_time, clang_ver, llvm_ver in res:
-                fails_dict, reduced_dict = fetch_failures(c, id_)
+                fails_dict, reduced_dict, reduced_sizes = fetch_failures(c, id_)
                 all_reasons = set(fails_dict.values())
                 all_reasons -= set(['OK'])
                 # changed failures
@@ -109,12 +139,14 @@ def main():
     if 'OK' in failures:
         del failures['OK']
 
-    # sort cases by whether reduced, secondarily by sha1
-    failures = [(x[0], sorted(x[1],
-                              key=lambda z: (not z in reduced_dict, z)))
+    # sort cases by size of reduced, secondarily by sha1
+    failures = [(x[0], sort_cases(x[1], reduced_dict, reduced_sizes))
                 for x in failures.items()]
     # sort by number of test cases triggering the crash
     failures.sort(key=lambda x: len(x[1]), reverse=True)
+    #print([(not z in reduced_dict,
+    #        len(reduced_dict.get(z, '')), z)
+    #       for z in failures[0][1]], file=sys.stderr)
 
     failures = [{'reason': x[0],
                  'cases': [case_dict(y, reduced_dict.get(y))
