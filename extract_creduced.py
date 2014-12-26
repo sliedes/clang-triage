@@ -6,11 +6,21 @@ import os
 
 def main():
     db = TriageDb()
-    os.mkdir('reduced')
+
+    DIGITS='0123456789abcdef'
+    if not os.path.isdir('cr'):
+        os.mkdir('cr')
+        for x in DIGITS:
+            os.mkdir('cr/'+x)
+            for y in DIGITS:
+                os.mkdir('cr/'+x+'/'+y)
+
     for contents in db.iterateDistinctReduced():
         sha = sha1(contents).hexdigest()
-        with open(os.path.join('reduced', sha+'.cpp'), 'wb') as f:
-            f.write(contents)
+        fname = 'cr/{}/{}/{}.cpp'.format(sha[0], sha[1], sha)
+        if not os.path.exists(fname):
+            with open(fname, 'wb') as f:
+                f.write(contents)
 
 if __name__ == '__main__':
     main()            

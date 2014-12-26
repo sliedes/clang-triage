@@ -12,8 +12,9 @@ DBNAME = 'clang_triage'
 MAX_SHOW_CASES = 20
 
 def fetch_failures(cursor, run_id):
+    'Returns sha, str, reduced_contents (which may be None)'
     c = cursor
-    c.execute('SELECT sha1, str, contents ' +
+    c.execute('SELECT sha1, str, cr.contents ' +
               'FROM (SELECT cases.id, cases.sha1, result_strings.str ' +
               '        FROM result_strings, results, cases ' +
               '        WHERE results.case_id=cases.id AND results.test_run=%s ' +
@@ -21,8 +22,9 @@ def fetch_failures(cursor, run_id):
               '    LEFT OUTER JOIN (' +
               '        SELECT DISTINCT ON (original) original, contents ' +
               '        FROM creduced_cases, creduced_contents ' +
-              '        WHERE creduced_id = creduced_cases.id) cc ' +
-              '    ON (cc.original = cas.id)', (run_id, ))
+              '        WHERE creduced_id = creduced_cases.id) cr ' +
+              '    ON (cr.original = cas.id), case_contents ' +
+              'WHERE cas.id=case_contents.case_id', (run_id, ))
     results = c.fetchall()
     fails_dict = dict([(x[0], x[1]) for x in results])
     reduced_dict = dict([(x[0], sha1(x[2]).hexdigest())
