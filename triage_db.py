@@ -85,7 +85,7 @@ CREATE VIEW failures_view AS
         AND results.result = res.id;
 
 CREATE VIEW failures_with_reduced_view AS
-    SELECT test_run, id, sha1, str, case_contents.contents AS reduced
+    SELECT test_run, id, sha1, str, cr.contents AS reduced
     FROM failures_view LEFT OUTER JOIN (
 	SELECT DISTINCT ON (original) original, contents
 	FROM creduced_cases AS cas, creduced_contents AS con

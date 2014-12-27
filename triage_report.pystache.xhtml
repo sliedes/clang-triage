@@ -12,13 +12,24 @@
   </head>
 
   <body>
-    <h2>Statistics</h2>
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#stats">Statistics</a></li>
+      <li><a href="#changes">Changes between test runs</a></li>
+      <li><a href="#latest">Test case summary for latest test run</a></li>
+      <li><a href="#download">Download test cases</a></li>
+    </ol>
+    <h2><a id="stats">Statistics</a></h2>
     <table>
+      <tr><td>Report date</td><td>{{date}}</td></tr>
       <tr><td>Test runs completed</td><td>{{numRunsCompleted}}</td></tr>
       <tr><td>Number of inputs in corpus</td><td>{{numInputs}}</td></tr>
       <tr><td>Last run completed</td><td>{{lastRunCompleted}}</td></tr>
+      <tr><td>Number of cases in CReduce queue</td><td>{{reduceQueueSize}}</td></tr>
+      <tr><td>Number of CReduced cases</td><td>{{numReduced}}</td></tr>
+      <tr><td>Number of cases where CReduce failed</td><td>{{numReduceFailed}}</td></tr>
     </table>
-    <h2>Changes between test runs</h2>
+    <h2><a id="changes">Changes between test runs</a></h2>
     {{#testRuns}}
     {{#anyChanged?}}
     <h3>Run #{{id}} on {{date}}, {{numDistinctFailures}} distinct crashes</h3>
@@ -47,12 +58,7 @@
     <span class="ver">{{prevVersion}}</span>.<br/>
     {{/anyChanged?}}
     {{/testRuns}}
-    <h2>Test case summary for last test run</h2>
-
-    <p>You can also download a <a href="all_cases.tar.bz2">tarball of
-	all the test cases</a> or
-	a <a href="all_reduced.tar.bz2">tarball of all CReduce results
-	so far</a>.</p>
+    <h2><a id="latest">Test case summary for latest test run</a></h2>
 
     {{#numDistinctFailures}}
     <p>Triggered <i>{{numDistinctFailures}}</i> distinct failures.</p>
@@ -68,5 +74,13 @@
     {{^failures}}
     <p>No failed test cases.</p>
     {{/failures}}
-  </body>
+
+    <h2><a id="download">Download test cases</a></h2>
+    <p>You can also download a <a href="all_cases.tar.bz2">tarball of
+	all the test cases</a> or
+      a <a href="all_reduced.tar.bz2">tarball of all CReduce results
+	so far</a>.</p>
+
+
+      </body>
 </html>
