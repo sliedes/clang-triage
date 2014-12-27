@@ -20,10 +20,6 @@ CREATE TABLE case_contents (
     case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE,
     z_contents BYTEA NOT NULL);
 
-CREATE TABLE creduced_contents (
-    creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
-    z_contents BYTEA NOT NULL);
-
 CREATE TYPE creduce_result AS ENUM ('ok', 'failed', 'no_crash');
 
 CREATE TABLE creduced_cases (
@@ -33,6 +29,10 @@ CREATE TABLE creduced_cases (
     llvm_version INTEGER NOT NULL,
     result creduce_result NOT NULL);
 CREATE UNIQUE INDEX creduced_cases_original_versions_unique ON creduced_cases (original, clang_version, llvm_version);
+
+CREATE TABLE creduced_contents (
+    creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
+    contents BYTEA NOT NULL);
 
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
@@ -60,7 +60,7 @@ CREATE TABLE results (
     result BIGINT NOT NULL,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE,
     FOREIGN KEY(test_run) REFERENCES test_runs(id) ON UPDATE CASCADE,
-    FOREIGN KEY(result) REFERENCES result_strings(id)) ON UPDATE CASCADE;
+    FOREIGN KEY(result) REFERENCES result_strings(id) ON UPDATE CASCADE);
 CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);
@@ -87,7 +87,7 @@ CREATE VIEW failures_view AS
 CREATE VIEW failures_with_reduced_view AS
     SELECT test_run, id, sha1, str, cr.contents AS reduced
     FROM failures_view LEFT OUTER JOIN (
-	SELECT DISTINCT ON (original) original, contents
+	SELECT DISTINCT ON (original) original, con.contents
 	FROM creduced_cases AS cas, creduced_contents AS con
 	WHERE con.creduced_id = cas.id) AS cr
     ON (cr.original = id), case_contents
