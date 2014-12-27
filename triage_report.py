@@ -128,10 +128,10 @@ def main():
             prev_version = version
             test_runs.append(d)
 
-            test_runs = test_runs[::-1]
-            with db.cursor() as c:
-                c.execute('SELECT COUNT(*) FROM case_contents')
-                num_inputs = c.fetchone()[0]
+        test_runs = test_runs[::-1]
+        with db.cursor() as c:
+            c.execute('SELECT COUNT(*) FROM case_contents')
+            num_inputs = c.fetchone()[0]
 
     num_runs_completed = len(test_runs)
     last_run_completed = test_runs[0]['endTime']
