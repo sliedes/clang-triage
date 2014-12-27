@@ -3,7 +3,6 @@
 import psycopg2 as pg
 import pystache
 import time
-import sys
 from hashlib import sha1
 
 from config import DB_NAME

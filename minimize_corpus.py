@@ -4,8 +4,6 @@ import sys
 import resource
 import shutil
 import os
-import copy
-import subprocess as subp
 
 from collections import Counter
 
@@ -29,7 +27,7 @@ def assert_dir(path):
         fatal("Error: Directory '%s' not found." % path)
 
 
-def load_trace(fname):
+def load_trace_pandas(fname):
     p = pandas.read_csv('.traces/' + fname, delimiter='/', header=None,
                         dtype=int)
     #return map(tuple, p.to_records(index=False))
@@ -48,6 +46,7 @@ def load_trace_no_pandas(fname):
 # We use read_csv from pandas because python is too slow...
 try:
     import pandas
+    load_trace = load_trace_pandas
 except ImportError:
     print('Warning: Failed to import pandas. This will be slower...')
     load_trace = load_trace_no_pandas
@@ -56,7 +55,7 @@ except ImportError:
 def save_trace(fname, tuples):
     with open('.traces/{}'.format(fname), 'w') as f:
         for a, b in tuples:
-            print('{:#05d}/{:d}'.format(a, b))
+            print('{:#05d}/{:d}'.format(a, b), file=f)
 
 
 def exec_showmap(path):

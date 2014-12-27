@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import psycopg2 as pg
-import sys
 import os
 import time
 import zlib
@@ -271,7 +270,6 @@ class TriageDb(object):
                 case_id = c.fetchone()
                 assert case_id, sha
                 case_id = case_id[0]
-                content_id = None
                 c.execute('INSERT INTO creduced_cases (original, ' +
                           '    clang_version, llvm_version, result) ' +
                           'VALUES (%s, %s, %s, %s) RETURNING id', (
