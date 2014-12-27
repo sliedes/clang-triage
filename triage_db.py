@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import psycopg2 as pg
-import sys, os, time, itertools
+import sys, os, time, itertools, zlib
 from enum import Enum
 
 from config import DB_NAME, POPULATE_FROM
@@ -18,11 +18,11 @@ CREATE TABLE cases (
 
 CREATE TABLE case_contents (
     case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE,
-    contents BYTEA NOT NULL);
+    z_contents BYTEA NOT NULL);
 
 CREATE TABLE creduced_contents (
     creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
-    contents BYTEA NOT NULL);
+    z_contents BYTEA NOT NULL);
 
 CREATE TYPE creduce_result AS ENUM ('ok', 'failed', 'no_crash');
 
@@ -67,12 +67,12 @@ CREATE INDEX results_result ON results(result);
 CREATE UNIQUE INDEX results_case_id_test_run ON results(case_id, test_run);
 
 CREATE VIEW case_view AS
-    SELECT id, sha1, contents
+    SELECT id, sha1, z_contents
     FROM cases, case_contents
     WHERE cases.id = case_contents.case_id;
 
 CREATE VIEW unreduced_cases_view AS
-    SELECT sha1, contents
+    SELECT sha1, z_contents
     FROM case_view AS cv
     WHERE NOT EXISTS (
         SELECT * FROM creduced_cases AS red
@@ -133,18 +133,19 @@ class TriageDb(object):
 
     def _addCaseContents(self, cursor, cases):
         cursor.executemany(
-            'INSERT INTO case_contents (case_id, contents) ' +
+            'INSERT INTO case_contents (case_id, z_contents) ' +
             '    (SELECT id, %s ' +
             '     FROM cases ' +
             '     WHERE sha1=%s AND NOT EXISTS (' +
             '         SELECT 1 FROM case_contents WHERE case_id=id))',
-            ((x[1], x[0]) for x in cases))
-        cursor.execute(
+            ((zlib.compress(x[1]), x[0]) for x in cases))
+        cursor.executemany(
             'INSERT INTO case_sizes (case_id, size) '  +
-            '    (SELECT case_id, length(contents) ' +
-            '     FROM case_contents WHERE NOT EXISTS (' +
+            '    (SELECT id, %s ' +
+            '     FROM cases WHERE sha1=%s AND NOT EXISTS (' +
             '         SELECT 1 FROM case_sizes ' +
-            '         WHERE case_sizes.case_id=case_contents.case_id))')
+            '         WHERE case_sizes.case_id=id))',
+            ((len(x[1]), x[0]) for x in cases))
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
@@ -163,11 +164,11 @@ class TriageDb(object):
         'Iterate through (sha1, contents) pairs.'
         with self.conn:
             c = self.conn.cursor()
-            c.execute('SELECT cc.sha1, cc.contents ' +
+            c.execute('SELECT cc.sha1, cc.z_contents ' +
                       'FROM case_view AS cc, case_sizes '
                       'WHERE case_sizes.case_id = cc.id ' +
                       'ORDER BY case_sizes.size')
-            return c
+            return ((x[0], zlib.decompress(x[1])) for x in c)
 
     def iterateDistinctReduced(self):
         with self.conn:
@@ -239,9 +240,12 @@ class TriageDb(object):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(
-                    'SELECT sha1, contents FROM unreduced_cases_view ' +
-                    'LIMIT 1')
-                return c.fetchone()
+                    'SELECT sha1, z_contents FROM unreduced_cases_view ' +
+                    'ORDER BY sha1 LIMIT 1')
+                r = c.fetchone()
+        if r is None:
+            return None
+        return (r[0], zlib.decompress(r[1]))
 
     def addCReduced(self, versions, sha, result, contents=None):
         if result == CReduceResult.ok:

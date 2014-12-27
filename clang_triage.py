@@ -82,6 +82,7 @@ def main():
     #test_iter(True)
     while True:
         test_iter(False)
+        subp.call(['./update-hook.sh'])
 
 
 if __name__ == '__main__':

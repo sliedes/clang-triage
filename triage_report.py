@@ -6,8 +6,6 @@ from hashlib import sha1
 
 from config import DB_NAME
 
-DBNAME = 'clang_triage'
-
 # show at most this many failing cases per reason
 MAX_SHOW_CASES = 20
 
@@ -42,6 +40,13 @@ def get_num_reduced(db):
         c.execute("SELECT COUNT(DISTINCT original) " +
                   "FROM creduced_cases WHERE result='ok'")
         return c.fetchone()[0]
+
+def get_num_distinct_reduced(db):
+    with db.cursor() as c:
+        c.execute("SELECT COUNT(DISTINCT contents) " +
+                  "FROM creduced_contents");
+        return c.fetchone()[0]
+
 
 def get_num_reduce_failed(db):
     with db.cursor() as c:
@@ -96,7 +101,7 @@ def main():
     with open('triage_report.pystache.xhtml') as f:
         TEMPLATE = pystache.parse(f.read())
 
-    db = pg.connect('dbname=' + DBNAME)
+    db = pg.connect('dbname=' + DB_NAME)
     with db:
         with db.cursor() as c:
             c.execute('SELECT id, start_time, end_time, clang_version, llvm_version ' +
@@ -142,6 +147,7 @@ def main():
                'lastRunCompleted': last_run_completed,
                'reduceQueueSize': get_reduce_queue_size(db),
                'numReduced': get_num_reduced(db),
+               'numDistinctReduced': get_num_distinct_reduced(db),
                'numReduceFailed': get_num_reduce_failed(db),
                'date': asctime()}
 
@@ -160,9 +166,6 @@ def main():
                 for x in failures.items()]
     # sort by number of test cases triggering the crash
     failures.sort(key=lambda x: len(x[1]), reverse=True)
-    #print([(not z in reduced_dict,
-    #        len(reduced_dict.get(z, '')), z)
-    #       for z in failures[0][1]], file=sys.stderr)
 
     failures = [{'reason': x[0],
                  'cases': [case_dict(y, reduced_dict.get(y))
