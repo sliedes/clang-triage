@@ -22,6 +22,8 @@ Triage engine
 * More controlled report generation instead of the current
   update-hook.sh
 
+* Handle update/build failures
+
 Report
 ======
 
