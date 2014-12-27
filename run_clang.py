@@ -1,20 +1,24 @@
-from config import MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS
+from config import (
+    MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS)
 import subprocess as subp
-import os, time
+import os
+import time
+
 
 def save_data(prefix, data):
     t = int(time.time())
     if not os.path.isdir(MISC_REPORT_SAVE_DIR):
         os.path.mkdir(MISC_REPORT_SAVE_DIR)
-    for i in range(-1,1000):
+    for i in range(-1, 1000):
         fname = os.path.join(MISC_REPORT_SAVE_DIR, '{}-{}'.format(
             prefix, t))
-        if i!= -1:
+        if i != -1:
             fname += '.' + str(i)
         if not os.path.exists(fname):
             with open(fname, 'wb') as f:
                 f.write(data)
                 return
+
 
 def check_for_clang_crash(output, retval):
     # timeout -> return value 124 (per timeout manual)
@@ -35,6 +39,7 @@ def check_for_clang_crash(output, retval):
     if retval > 128:
         return 'Killed by signal %d' % (retval-128)
     return None
+
 
 def test_input(data, extra_params=[]):
     CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params

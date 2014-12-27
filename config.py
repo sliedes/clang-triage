@@ -19,7 +19,7 @@ CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-o' '/dev/null', '-']
 
 # A map from human-readable names to directories where to run git pull
-PROJECTS = {'llvm' : LLVM_SRC, 'clang' : LLVM_SRC + '/tools/clang'}
+PROJECTS = {'llvm': LLVM_SRC, 'clang': LLVM_SRC + '/tools/clang'}
 
 # Path to tested binary
 CLANG_BINARY = BUILD + '/bin/clang'

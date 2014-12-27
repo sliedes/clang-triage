@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 
-import os, tempfile, sys, string
+import os
+import tempfile
+import sys
+import string
 import subprocess as subp
+
 from run_clang import test_input
 from utils import env_with_tmpdir
-
 from config import CREDUCE_PROPERTY_SCRIPT, CREDUCE_TIMEOUT
+
 
 def run_creduce(data, reason):
     assert reason, 'Cannot run_creduce() on a non-crashing input.'
     assert (os.path.isfile(CREDUCE_PROPERTY_SCRIPT) and
             os.access(CREDUCE_PROPERTY_SCRIPT, os.X_OK)), (
-        'No %s in cwd %s (or not executable).' % (CREDUCE_PROPERTY_SCRIPT, os.getcwd()))
+        'No %s in cwd %s (or not executable).' % (
+            CREDUCE_PROPERTY_SCRIPT, os.getcwd()))
     with tempfile.TemporaryDirectory(prefix='clang_triage') as creduce_dir:
         # creduce may leave files, so point TMPDIR below our creduce
         # temp dir
@@ -46,7 +51,9 @@ def run_creduce(data, reason):
         return None
     return reduced
 
+
 PRINTABLE = string.printable.encode('ascii')
+
 
 def try_remove_nonprintables(contents, reason):
     reduced = b''

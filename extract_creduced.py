@@ -4,10 +4,11 @@ from triage_db import TriageDb
 from hashlib import sha1
 import os
 
+
 def main():
     db = TriageDb()
 
-    DIGITS='0123456789abcdef'
+    DIGITS = '0123456789abcdef'
     if not os.path.isdir('cr'):
         os.mkdir('cr')
         for x in DIGITS:
@@ -23,4 +24,4 @@ def main():
                 f.write(contents)
 
 if __name__ == '__main__':
-    main()            
+    main()

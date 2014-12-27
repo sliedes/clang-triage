@@ -1,7 +1,10 @@
-from config import PROJECTS, MIN_GIT_CHECKOUT_INTERVAL, NINJA_PARAMS, BUILD
-import sys, time
+import sys
+import time
 import subprocess as subp
+
 from utils import const
+from config import PROJECTS, MIN_GIT_CHECKOUT_INTERVAL, NINJA_PARAMS, BUILD
+
 
 class CommitInfo(object):
     def __git(self, fmt):
@@ -10,7 +13,7 @@ class CommitInfo(object):
         assert out.endswith('\n')
         return out[:-1]
 
-    def __init__(self, path, name = None):
+    def __init__(self, path, name=None):
         self.path = path
 
         if not name:
@@ -36,7 +39,8 @@ class CommitInfo(object):
 
     def __str__(self):
         return 'CommitInfo(commit_id={commit_id}, short="{short}")'.format(
-            commit_id = self.commit_id, short = self.short)
+            commit_id=self.commit_id, short=self.short)
+
 
 def git_pull(path):
     try:
@@ -47,7 +51,9 @@ def git_pull(path):
         print('Output was:\n' + e.output.decode('utf-8'), file=sys.stderr)
         raise
 
+
 LAST_UPDATED = 0
+
 
 def update_all(versions, idle_func=const(False)):
     '''Update repositories if interval has passed. If not, call idle_func
@@ -68,6 +74,7 @@ def update_all(versions, idle_func=const(False)):
         git_pull(path)
     LAST_UPDATED = time.time()
 
+
 def get_versions():
     'Returns a dict of svn revisions.'
     out = {}
@@ -77,8 +84,10 @@ def get_versions():
         out[proj] = info.svn_revision
     return out
 
+
 def build():
     subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
+
 
 def update_and_build(idle_func=const(False)):
     versions = get_versions()

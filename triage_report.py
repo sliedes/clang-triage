@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 import psycopg2 as pg
-import pystache, time, sys
+import pystache
+import time
+import sys
 from hashlib import sha1
 
 from config import DB_NAME
 
 # show at most this many failing cases per reason
 MAX_SHOW_CASES = 20
+
 
 # RFC 2822
 def asctime(t=None):
@@ -16,6 +19,7 @@ def asctime(t=None):
         return time.strftime(fmt)
     else:
         return time.strftime(fmt, t)
+
 
 def fetch_failures(db, run_id):
     with db.cursor() as c:
@@ -30,10 +34,12 @@ def fetch_failures(db, run_id):
                           for x in results if x[2]])
     return fails_dict, reduced_dict, reduced_sizes
 
+
 def get_reduce_queue_size(db):
     with db.cursor() as c:
         c.execute('SELECT COUNT(*) FROM unreduced_cases_view')
         return c.fetchone()[0]
+
 
 def get_num_reduced(db):
     with db.cursor() as c:
@@ -41,17 +47,20 @@ def get_num_reduced(db):
                   "FROM creduced_cases WHERE result='ok'")
         return c.fetchone()[0]
 
+
 def get_num_distinct_reduced(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT contents) " +
-                  "FROM creduced_contents");
+                  "FROM creduced_contents")
         return c.fetchone()[0]
+
 
 def get_num_reduce_failed(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
                   "FROM creduced_cases WHERE result='failed'")
         return c.fetchone()[0]
+
 
 def case_dict(sha, reduced=None):
     d = {'case': sha, 'shortCase': sha[0:6],
@@ -62,10 +71,12 @@ def case_dict(sha, reduced=None):
             reduced[0], reduced[1], reduced)
     return d
 
+
 def build_failure_ctx(sha, reason, old_reason, reduced=None):
     d = case_dict(sha, reduced)
     d.update({'reason': reason, 'oldReason': old_reason})
     return d
+
 
 def split_by(pred, xs):
     a = ([], [])
@@ -74,6 +85,7 @@ def split_by(pred, xs):
         a[bool(pred(x))].append(x)
 
     return a
+
 
 def sort_cases(cases, reduced_dict, reduced_sizes):
     not_reduced, reduced = split_by(lambda x: x in reduced_dict, cases)
@@ -96,6 +108,7 @@ def sort_cases(cases, reduced_dict, reduced_sizes):
 
     return unique_reduced + not_reduced + duplicate_reduced
 
+
 class TestRun:
     def __init__(self, db, run_id, start_time, end_time, clang_ver, llvm_ver):
         self.db = db
@@ -104,7 +117,8 @@ class TestRun:
         self.end_time = end_time
         self.clang_ver = clang_ver
         self.llvm_ver = llvm_ver
-        self.fails_dict, self.reduced_dict, self.reduced_sizes = fetch_failures(db, run_id)
+        self.fails_dict, self.reduced_dict, self.reduced_sizes = (
+            fetch_failures(db, run_id))
         self.version = 'clang {}, llvm {}'.format(clang_ver, llvm_ver)
 
     def ctx(self, prev=None):
@@ -117,17 +131,18 @@ class TestRun:
         all_reasons -= set(['OK'])
         # changed failures
         fails = [build_failure_ctx(x[0], x[1], prev_fails[x[0]],
-                              self.reduced_dict.get(x[0]))
+                                   self.reduced_dict.get(x[0]))
                  for x in sorted(self.fails_dict.items())
                  if (x[0] in prev_fails
                      and prev_fails[x[0]] != x[1])]
-        d = {'id': self.run_id, 'date': asctime(time.localtime(self.start_time)),
+        d = {'id': self.run_id,
+             'date': asctime(time.localtime(self.start_time)),
              'duration': '{:d}'.format(self.end_time-self.start_time),
              'version': self.version, 'prevVersion': prev_version,
              'newFailures': fails,
              'numDistinctFailures': len(all_reasons),
              'endTime': asctime(time.localtime(self.end_time)),
-             'anyChanged?': len(fails)>0}
+             'anyChanged?': len(fails) > 0}
         return d
 
 
@@ -138,7 +153,8 @@ def main():
     db = pg.connect('dbname=' + DB_NAME)
     with db:
         with db.cursor() as c:
-            c.execute('SELECT id, start_time, end_time, clang_version, llvm_version ' +
+            c.execute('SELECT id, start_time, end_time, clang_version, ' +
+                      '    llvm_version ' +
                       'FROM test_runs ORDER BY start_time')
             res = c.fetchall()
         test_runs = []

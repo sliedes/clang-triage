@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
 import psycopg2 as pg
-import sys, os, time, itertools, zlib
+import sys
+import os
+import time
+import zlib
 from enum import Enum
 
 from config import DB_NAME, POPULATE_FROM
+
 
 class CReduceResult(Enum):
     ok = 1
@@ -28,10 +32,12 @@ CREATE TABLE creduced_cases (
     clang_version INTEGER NOT NULL,
     llvm_version INTEGER NOT NULL,
     result creduce_result NOT NULL);
-CREATE UNIQUE INDEX creduced_cases_original_versions_unique ON creduced_cases (original, clang_version, llvm_version);
+CREATE UNIQUE INDEX creduced_cases_original_versions_unique
+ON creduced_cases (original, clang_version, llvm_version);
 
 CREATE TABLE creduced_contents (
-    creduced_id BIGINT NOT NULL REFERENCES creduced_cases(id) ON UPDATE CASCADE,
+    creduced_id BIGINT NOT NULL
+        REFERENCES creduced_cases(id) ON UPDATE CASCADE,
     contents BYTEA NOT NULL);
 
 CREATE TABLE case_sizes (
@@ -47,7 +53,8 @@ CREATE TABLE test_runs (
     clang_version INTEGER NOT NULL,
     llvm_version INTEGER NOT NULL);
 CREATE INDEX test_runs_start_time ON test_runs(start_time);
-CREATE UNIQUE INDEX test_runs_versions ON test_runs(clang_version, llvm_version);
+CREATE UNIQUE INDEX test_runs_versions
+    ON test_runs(clang_version, llvm_version);
 
 CREATE TABLE result_strings (
     id BIGSERIAL PRIMARY KEY,
@@ -76,7 +83,7 @@ CREATE VIEW unreduced_cases_view AS
     FROM case_view AS cv
     WHERE NOT EXISTS (
         SELECT * FROM creduced_cases AS red
-	WHERE red.original = cv.id);
+        WHERE red.original = cv.id);
 
 CREATE VIEW failures_view AS
     SELECT test_run, cases.id, sha1, str
@@ -87,16 +94,18 @@ CREATE VIEW failures_view AS
 CREATE VIEW failures_with_reduced_view AS
     SELECT test_run, id, sha1, str, cr.contents AS reduced
     FROM failures_view LEFT OUTER JOIN (
-	SELECT DISTINCT ON (original) original, con.contents
-	FROM creduced_cases AS cas, creduced_contents AS con
-	WHERE con.creduced_id = cas.id) AS cr
+        SELECT DISTINCT ON (original) original, con.contents
+        FROM creduced_cases AS cas, creduced_contents AS con
+        WHERE con.creduced_id = cas.id) AS cr
     ON (cr.original = id), case_contents
     WHERE id = case_contents.case_id;
 '''.strip()
 
+
 def readFile(path):
     with open(path, 'rb') as f:
         return f.read()
+
 
 class TriageDb(object):
     def __init__(self):
@@ -140,7 +149,7 @@ class TriageDb(object):
             '         SELECT 1 FROM case_contents WHERE case_id=id))',
             ((zlib.compress(x[1]), x[0]) for x in cases))
         cursor.executemany(
-            'INSERT INTO case_sizes (case_id, size) '  +
+            'INSERT INTO case_sizes (case_id, size) ' +
             '    (SELECT id, %s ' +
             '     FROM cases WHERE sha1=%s AND NOT EXISTS (' +
             '         SELECT 1 FROM case_sizes ' +
@@ -156,9 +165,9 @@ class TriageDb(object):
                 self._addCaseNames(c, case_names)
 
                 # FIXME calculate sha1
-                self._addCaseContents(c,
-                                      ((sha, readFile(os.path.join(cases_path, fname)))
-                                       for sha, fname in zip(case_names, case_files)))
+                self._addCaseContents(
+                    c, ((sha, readFile(os.path.join(cases_path, fname)))
+                        for sha, fname in zip(case_names, case_files)))
 
     def iterateCases(self):
         'Iterate through (sha1, contents) pairs.'
@@ -191,8 +200,8 @@ class TriageDb(object):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(
-                    'INSERT INTO test_runs ' +
-                    '    (start_time, end_time, clang_version, llvm_version) ' +
+                    'INSERT INTO test_runs (start_time, end_time, ' +
+                    '    clang_version, llvm_version) ' +
                     'VALUES (%s, %s, %s, %s) RETURNING id',
                     (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
@@ -210,7 +219,7 @@ class TriageDb(object):
         c.executemany('INSERT INTO result_strings (str) SELECT %s ' +
                       'WHERE NOT EXISTS ( ' +
                       '    SELECT 1 from result_strings WHERE str=%s)',
-                      ((x,x) for x in unique_results))
+                      ((x, x) for x in unique_results))
         c.executemany('INSERT INTO results (case_id, test_run, result) ' +
                       '    (SELECT cases.id, %s, result_strings.id ' +
                       '     FROM cases, result_strings ' +
@@ -270,7 +279,8 @@ class TriageDb(object):
                               result.name))
                 cr_id = c.fetchone()[0]
                 if not contents is None:
-                    c.execute('INSERT INTO creduced_contents (creduced_id, contents) ' +
+                    c.execute('INSERT INTO creduced_contents ' +
+                              '    (creduced_id, contents) ' +
                               'VALUES (%s, %s)', (cr_id, contents))
 
     class TestRunContext(object):
@@ -293,9 +303,11 @@ class TriageDb(object):
         def addResult(self, sha, result_string):
             self.results.append((sha, result_string))
 
+
 def test(db):
     for name, contents in db.iterateCases():
         print((name, len(contents)))
+
 
 def main():
     db = TriageDb()

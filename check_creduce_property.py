@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import run_clang as rc
-import sys, os
+import sys
+import os
+
 
 def read_or_die(fname):
     try:
@@ -10,6 +12,7 @@ def read_or_die(fname):
     except IOError:
         print('FATAL: Unable to open %s.' % fname)
         sys.exit(1)
+
 
 def main():
     fname = 'crash_reason.dat'

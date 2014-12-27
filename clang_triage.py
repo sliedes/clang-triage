@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
-import os, sys, subprocess as subp, time
+import os
+import sys
+import subprocess as subp
+import time
+
 from triage_db import TriageDb, CReduceResult
 from repository import update_and_build, get_versions
 from run_clang import test_input
 from run_creduce import reduce_one
+
 
 def creduce_worker_one_iter(db, versions):
     work = db.getCReduceWork()
@@ -26,21 +31,25 @@ def creduce_worker_one_iter(db, versions):
         db.addCReduced(versions, sha, CReduceResult.failed)
     return True
 
+
 def update_and_check_if_should_run(db):
     versions = get_versions()
     idle_func = lambda: creduce_worker_one_iter(db, versions)
-    update_and_build(idle_func) # sleeps or runs creduce
+    update_and_build(idle_func)  # sleeps or runs creduce
     versions = get_versions()
 
     lastRun = db.getLastRunTimeByVersions(versions)
     if lastRun:
-        print('A test run with these versions was started at {} and completed at {}. Skipping test.'.format(
-            time.asctime(time.localtime(lastRun[0])), time.asctime(time.localtime(lastRun[1]))),
+        print('A test run with these versions was started at {} ' +
+              'and completed at {}. Skipping test.'.format(
+                  time.asctime(time.localtime(lastRun[0])),
+                  time.asctime(time.localtime(lastRun[1]))),
               file=sys.stderr)
         return False
     else:
         print('Version previously unseen. Running test...', file=sys.stderr)
     return True
+
 
 def test_iter(start_from_current=False):
     '''Build new version if available and execute tests.
@@ -57,7 +66,7 @@ def test_iter(start_from_current=False):
     # race between checking version and starting the test run.
     numCases = db.getNumberOfCases()
     with db.testRun(versions) as run:
-        i=1
+        i = 1
         numBad = 0
         for sha, data in db.iterateCases():
             reason = test_input(data)
@@ -77,6 +86,7 @@ def test_iter(start_from_current=False):
             #    s = '{sha}\t-O3 only: {reason}'
             #    print(s.format(sha=sha, reason=reason))
         print(file=sys.stderr)
+
 
 def main():
     #test_iter(True)

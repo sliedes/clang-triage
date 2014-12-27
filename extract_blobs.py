@@ -3,10 +3,11 @@
 from triage_db import TriageDb
 import os
 
+
 def main():
     db = TriageDb()
 
-    DIGITS='0123456789abcdef'
+    DIGITS = '0123456789abcdef'
     os.mkdir('sha')
     for x in DIGITS:
         os.mkdir('sha/'+x)
@@ -18,6 +19,7 @@ def main():
         fname = 'sha/{}/{}/{}.cpp'.format(sha[0], sha[1], sha)
         with open(fname, 'wb') as f:
             f.write(contents)
+
 
 if __name__ == '__main__':
     main()

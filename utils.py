@@ -1,4 +1,6 @@
-import os, copy
+import os
+import copy
+
 
 def env_with_tmpdir(path):
     env = copy.copy(os.environ)
@@ -6,6 +8,7 @@ def env_with_tmpdir(path):
     env['TMP'] = path
     env['TEMP'] = path
     return env
+
 
 def const(x):
     'Returns a constant function.'
