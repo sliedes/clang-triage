@@ -36,21 +36,17 @@
     <h3>Run #{{id}} on {{date}}, {{numDistinctFailures}} distinct crashes</h3>
     <p>Version: <span class="ver">{{version}}</span></p>
     <p>Changed failures since <span class="ver">{{prevVersion}}</span>:</p>
-    <table>
-      <tr><th>Test case</th><th>Failure reason</th></tr>
-      {{#newFailures}}
-      <tr><td><a href="{{url}}">{{shortCase}}</a>
-	  {{#haveReduced}}
-	  <br/><a href="{{reducedUrl}}"><small>(reduced)</small></a>
-	  {{/haveReduced}}
-	</td><td>
-	  <table style="border: 0">
-	    <tr><td>New:</td><td>{{reason}}</td></tr>
-	    <tr><td>Was:</td><td>{{oldReason}}</td></tr>
-	  </table>
-      </td></tr>
-      {{/newFailures}}
-    </table>
+    {{#newFailures}}
+    <p>
+      <b>Was:</b> {{oldReason}}<br/>
+      <b>New:</b> {{reason}}<br/>
+      <b>Cases:</b> (num={{numCases}})<br/>
+      {{#cases}}
+      <a href="{{url}}" class="mo">{{shortCase}}</a>{{#haveReduced}}<a href="{{reducedUrl}}">
+	<small>(reduced)</small></a>{{/haveReduced}}{{^isLast}}, {{/isLast}}
+      {{/cases}}{{#ellipsis}}...{{/ellipsis}}
+    </p>
+    {{/newFailures}}
     <hr/>
     {{/anyChanged?}}
     {{^anyChanged?}}

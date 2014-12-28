@@ -71,9 +71,21 @@ def case_dict(sha, reduced=None):
     return d
 
 
-def build_failure_ctx(sha, reason, old_reason, reduced=None):
-    d = case_dict(sha, reduced)
-    d.update({'reason': reason, 'oldReason': old_reason})
+# FIXME reduced cases
+def build_failure_context(reason, old_reason, cases, reduced=None):
+    if reduced:
+        cases = zip(cases, reduced)
+    else:
+        cases = [(x, None) for x in cases]
+    ds = [case_dict(*case) for case in cases]
+    ds[-1]['isLast'] = True
+    num_cases = len(ds)
+    ellipsis = False
+    if num_cases > MAX_SHOW_CASES:
+        ds = ds[:MAX_SHOW_CASES]
+        ellipsis = True
+    d = {'reason': reason, 'oldReason': old_reason, 'cases': ds,
+         'numCases': num_cases, 'ellipsis': ellipsis}
     return d
 
 
@@ -93,7 +105,7 @@ def sort_cases(cases, reduced_dict, reduced_sizes):
     # sort reduced by size, sha
     reduced.sort(key=lambda x: (reduced_sizes[x], x))
 
-    # move last cases which move to something already seen earlier
+    # move last cases which reduce to something already seen earlier
     unique_reduced = []
     duplicate_reduced = []
     seen = set()
@@ -106,6 +118,22 @@ def sort_cases(cases, reduced_dict, reduced_sizes):
             unique_reduced.append(x)
 
     return unique_reduced + not_reduced + duplicate_reduced
+
+
+def group_changed_failures(changed_fails, reduced_dict, reduced_sizes):
+    'changed_fails: [(sha1, reason, prev_reason)]'
+
+    groups = {}
+    for sha1, reason, prev_reason in changed_fails:
+        rt = (reason, prev_reason)
+        if not rt in groups:
+            groups[rt] = []
+        groups[rt].append(sha1)
+
+    for x in groups:
+        groups[x] = sort_cases(groups[x], reduced_dict, reduced_sizes)
+
+    return sorted(groups.items(), key=lambda x: (x[0][1], x[0][0], x[1]))
 
 
 class TestRun:
@@ -128,12 +156,21 @@ class TestRun:
             prev_version = prev.version
         all_reasons = set(self.fails_dict.values())
         all_reasons -= set(['OK'])
-        # changed failures
-        fails = [build_failure_ctx(x[0], x[1], prev_fails[x[0]],
-                                   self.reduced_dict.get(x[0]))
-                 for x in sorted(self.fails_dict.items())
-                 if (x[0] in prev_fails
-                     and prev_fails[x[0]] != x[1])]
+
+        changed_fails = [
+            (x[0], x[1], prev_fails[x[0]])
+            for x in sorted(self.fails_dict.items())
+            if x[0] in prev_fails and prev_fails[x[0]] != x[1]]
+
+        # group changed failures by (old, new)
+        changed_fails = group_changed_failures(
+            changed_fails, self.reduced_dict, self.reduced_sizes)
+
+        fails = [build_failure_context(
+            x[0][0], x[0][1], x[1],
+            [self.reduced_dict.get(y) for y in x[1]])
+                 for x in changed_fails]
+
         d = {'id': self.run_id,
              'date': asctime(time.localtime(self.start_time)),
              'duration': '{:d}'.format(self.end_time-self.start_time),
