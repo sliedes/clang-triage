@@ -3,9 +3,9 @@
 import run_clang as rc
 import sys
 import os
+import typing
 
-
-def read_or_die(fname):
+def read_or_die(fname: str) -> bytes:
     try:
         with open(fname, 'rb') as f:
             return f.read()
@@ -20,7 +20,7 @@ def main():
         fname = os.path.join(os.environ['CLANG_TRIAGE_TMP'], fname)
     reason = read_or_die(fname).decode('utf-8')
     data = read_or_die('buggy.cpp')
-    result = rc.test_input(data)
+    result = rc.test_input(data)[0]
     if result.strip() == reason.strip():
         sys.exit(0)
     else:

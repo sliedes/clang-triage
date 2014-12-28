@@ -118,6 +118,11 @@ CREATE VIEW changed_results AS
         last.result AS new, second.result AS old
     FROM last_run_results AS last, second_last_run_results AS second
     WHERE last.case_id=second.case_id AND last.result<>second.result;
+
+CREATE TABLE outputs (
+   case_id BIGINT UNIQUE REFERENCES cases(id)
+       ON UPDATE CASCADE ON DELETE CASCADE,
+   output BYTEA NOT NULL);
 '''.strip()
 
 
@@ -212,7 +217,9 @@ class TriageDb(object):
 
     def _addTestRun(self, versions: Dict[str, int],
                     start_time: int, end_time: int,
-                    results: Iterable[Tuple[str, str]]) -> None:
+                    results: Iterable[Tuple[str, str, bytes]]) -> None:
+        '''results: [(sha, result_string, output)].
+        Output may be None if result_string="OK".'''
         assert 'clang' in versions, versions
         assert 'llvm' in versions, versions
         clang_version = versions['clang']
@@ -236,8 +243,9 @@ class TriageDb(object):
         return TriageDb.TestRunContext(self, versions)
 
     def _addResults(self, cursor, run_id: int,
-                    results: Iterable[Tuple[str, str]]) -> None:
-        'results: [(sha, result_string)]'
+                    results: List[Tuple[str, str, bytes]]) -> None:
+        '''results: [(sha, result_string, output)].
+        Output may be None if result_string="OK".'''
         c = cursor
         # insert result strings if they do not already exist
         unique_results = set(x[1] for x in results)
@@ -250,6 +258,15 @@ class TriageDb(object):
                       '     FROM cases, result_strings ' +
                       '     WHERE cases.sha1=%s AND str=%s)',
                       [(run_id, x[0], x[1]) for x in results])
+        # insert/replace outputs
+        outputs = [(x[0], x[2]) for x in results if x[1] != 'OK']
+
+        c.executemany('DELETE FROM outputs ' +
+                      'WHERE case_id=(SELECT id FROM cases WHERE sha1=%s)',
+                      (x[0] for x in outputs))
+        c.executemany('INSERT INTO outputs VALUES (case_id, output) ' +
+                      'SELECT id, %s FROM cases WHERE sha1=%s',
+                      ((zlib.compress(x[1]), x[0]) for x in outputs))
 
     def getLastRunTimeByVersions(
             self, versions: Dict[str, str]) -> Tuple[int, int]:
@@ -326,8 +343,10 @@ class TriageDb(object):
                                     self.start_time, int(time.time()),
                                     self.results)
 
-        def addResult(self, sha: str, result_string: str) -> None:
-            self.results.append((sha, result_string))
+        def addResult(self, sha: str, result_string: str,
+                      output: bytes) -> None:
+            'Output will be ignored if result_string="OK".'
+            self.results.append((sha, result_string, output))
 
 
 def test(db):
