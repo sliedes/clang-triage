@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import typing
-from typing import Iterable, List, Dict, Tuple
 import psycopg2 as pg
 import os
 import time
@@ -126,7 +124,7 @@ CREATE TABLE outputs (
 '''.strip()
 
 
-def readFile(path: str) -> bytes:
+def readFile(path):
     with open(path, 'rb') as f:
         return f.read()
 
@@ -135,36 +133,35 @@ class TriageDb(object):
     def __init__(self):
         self.conn = pg.connect('dbname=' + DB_NAME)
 
-    def createSchema(self) -> None:
+    def createSchema(self):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(_CREATE_TABLES_SQL)
 
-    def doesCaseExist(self, sha: str) -> bool:
+    def doesCaseExist(self, sha):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT COUNT(*) FROM cases WHERE sha1=%s', sha)
                 return bool(c.fetchone()[0])
 
-    def addCase(self, sha: str, contents: bytes) -> None:
+    def addCase(self, sha, contents):
         self.addCases([(sha, contents)])
 
     # FIXME this may be slow?
-    def addCases(self, cases: Iterable[Tuple[str, bytes]]) -> None:
+    def addCases(self, cases):
         with self.conn:
             with self.conn.cursor() as c:
                 for sha, contents in cases:
                     self._addCaseNames(c, [sha])
                     self._addCaseContents(c, [(sha, contents)])
 
-    def _addCaseNames(self, cursor, casenames: Iterable[str]) -> None:
+    def _addCaseNames(self, cursor, casenames):
         cursor.executemany('INSERT INTO cases (sha1) '
                            'SELECT %s WHERE NOT EXISTS (' +
                            '    SELECT 1 FROM cases WHERE sha1=%s)',
                            ((x, x) for x in casenames))
 
-    def _addCaseContents(self, cursor,
-                         cases: List[Tuple[str, bytes]]) -> None:
+    def _addCaseContents(self, cursor, cases):
         cursor.executemany(
             'INSERT INTO case_contents (case_id, z_contents) ' +
             '    (SELECT id, %s ' +
@@ -180,7 +177,7 @@ class TriageDb(object):
             '         WHERE case_sizes.case_id=id))',
             ((len(x[1]), x[0]) for x in cases))
 
-    def populateCases(self, cases_path: str) -> None:
+    def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
         case_names = [sha for sha, cpp in [x.split('.') for x in case_files]]
         #print('Adding names...')
@@ -193,7 +190,7 @@ class TriageDb(object):
                     c, ((sha, readFile(os.path.join(cases_path, fname)))
                         for sha, fname in zip(case_names, case_files)))
 
-    def iterateCases(self) -> Iterable[Tuple[str, bytes]]:
+    def iterateCases(self):
         'Iterate through (sha1, contents) pairs.'
         with self.conn:
             c = self.conn.cursor()
@@ -203,21 +200,19 @@ class TriageDb(object):
                       'ORDER BY case_sizes.size')
             return ((x[0], zlib.decompress(x[1])) for x in c)
 
-    def iterateDistinctReduced(self) -> Iterable[bytes]:
+    def iterateDistinctReduced(self):
         with self.conn:
             c = self.conn.cursor()
             c.execute('SELECT DISTINCT contents FROM creduced_contents')
             return (x[0] for x in c)
 
-    def getNumberOfCases(self) -> int:
+    def getNumberOfCases(self):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT count(*) from case_contents')
                 return c.fetchone()[0]
 
-    def _addTestRun(self, versions: Dict[str, int],
-                    start_time: int, end_time: int,
-                    results: Iterable[Tuple[str, str, bytes]]) -> None:
+    def _addTestRun(self, versions, start_time, end_time, results):
         '''results: [(sha, result_string, output)].
         Output may be None if result_string="OK".'''
         assert 'clang' in versions, versions
@@ -242,8 +237,7 @@ class TriageDb(object):
         'A context manager for test runs.'
         return TriageDb.TestRunContext(self, versions)
 
-    def _addResults(self, cursor, run_id: int,
-                    results: List[Tuple[str, str, bytes]]) -> None:
+    def _addResults(self, cursor, run_id, results):
         '''results: [(sha, result_string, output)].
         Output may be None if result_string="OK".'''
         c = cursor
@@ -268,8 +262,7 @@ class TriageDb(object):
                       'SELECT id, %s FROM cases WHERE sha1=%s',
                       ((zlib.compress(x[1]), x[0]) for x in outputs))
 
-    def getLastRunTimeByVersions(
-            self, versions: Dict[str, str]) -> Tuple[int, int]:
+    def getLastRunTimeByVersions(self, versions):
         '''Returns (start_time, end_time) of the test run with these versions.
            If no test has been run with this version, returns None.'''
         assert 'clang' in versions, versions
@@ -287,7 +280,7 @@ class TriageDb(object):
                           'LIMIT 1', (clang_version, llvm_version))
                 return c.fetchone()
 
-    def getCReduceWork(self) -> Tuple[str, bytes]:
+    def getCReduceWork(self):
         'Get (sha, content) pair to run through creduce. None if none.'
         with self.conn:
             with self.conn.cursor() as c:
@@ -299,8 +292,7 @@ class TriageDb(object):
             return None
         return (r[0], zlib.decompress(r[1]))
 
-    def addCReduced(self, versions: Dict[str, str], sha: str,
-                    result: bytes, contents: bytes=None) -> None:
+    def addCReduced(self, versions, sha, result, contents=None):
         if result == CReduceResult.ok:
             assert contents, 'Result OK but no contents?'
         else:
@@ -343,8 +335,7 @@ class TriageDb(object):
                                     self.start_time, int(time.time()),
                                     self.results)
 
-        def addResult(self, sha: str, result_string: str,
-                      output: bytes) -> None:
+        def addResult(self, sha, result_string, output):
             'Output will be ignored if result_string="OK".'
             self.results.append((sha, result_string, output))
 

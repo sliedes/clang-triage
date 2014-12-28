@@ -2,12 +2,11 @@ import subprocess as subp
 import os
 import time
 import typing
-from typing import List, Tuple
 
 from config import (
     MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS)
 
-def save_data(prefix: str, data: bytes) -> None:
+def save_data(prefix, data):
     t = int(time.time())
     if not os.path.isdir(MISC_REPORT_SAVE_DIR):
         os.path.mkdir(MISC_REPORT_SAVE_DIR)
@@ -43,8 +42,7 @@ def check_for_clang_crash(output, retval):
     return None
 
 
-def test_input(data: bytes,
-               extra_params: List[str] = []) -> Tuple[str, bytes]:
+def test_input(data, extra_params=[]):
     CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
     p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
                    stderr=subp.STDOUT, cwd='/')
