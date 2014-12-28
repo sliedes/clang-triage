@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import typing
+from typing import Iterable, List, Dict, Tuple
 import psycopg2 as pg
 import os
 import time
@@ -36,7 +38,7 @@ ON creduced_cases (original, clang_version, llvm_version);
 
 CREATE TABLE creduced_contents (
     creduced_id BIGINT NOT NULL
-        REFERENCES creduced_cases(id) ON UPDATE CASCADE,
+        REFERENCES creduced_cases(id) ON UPDATE CASCADE ON DELETE CASCADE,
     contents BYTEA NOT NULL);
 
 CREATE TABLE case_sizes (
@@ -98,10 +100,28 @@ CREATE VIEW failures_with_reduced_view AS
         WHERE con.creduced_id = cas.id) AS cr
     ON (cr.original = id), case_contents
     WHERE id = case_contents.case_id;
+
+CREATE VIEW last_2_runs_view AS
+    SELECT id FROM test_runs
+    ORDER BY id DESC LIMIT 2;
+
+CREATE VIEW last_run_results AS
+    SELECT * FROM results
+    WHERE test_run=(SELECT MAX(id) FROM last_2_runs_view);
+
+CREATE VIEW second_last_run_results AS
+    SELECT * FROM results
+    WHERE test_run=(SELECT MIN(id) FROM last_2_runs_view);
+
+CREATE VIEW changed_results AS
+    SELECT last.id AS id1, second.id AS id2, last.case_id,
+        last.result AS new, second.result AS old
+    FROM last_run_results AS last, second_last_run_results AS second
+    WHERE last.case_id=second.case_id AND last.result<>second.result;
 '''.strip()
 
 
-def readFile(path):
+def readFile(path: str) -> bytes:
     with open(path, 'rb') as f:
         return f.read()
 
@@ -110,36 +130,36 @@ class TriageDb(object):
     def __init__(self):
         self.conn = pg.connect('dbname=' + DB_NAME)
 
-    def createSchema(self):
+    def createSchema(self) -> None:
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(_CREATE_TABLES_SQL)
 
-    def doesCaseExist(self, sha):
+    def doesCaseExist(self, sha: str) -> bool:
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT COUNT(*) FROM cases WHERE sha1=%s', sha)
                 return bool(c.fetchone()[0])
 
-    def addCase(self, sha, contents):
+    def addCase(self, sha: str, contents: bytes) -> None:
         self.addCases([(sha, contents)])
 
     # FIXME this may be slow?
-    def addCases(self, cases):
-        'cases: iterator of (sha, contents)'
+    def addCases(self, cases: Iterable[Tuple[str, bytes]]) -> None:
         with self.conn:
             with self.conn.cursor() as c:
                 for sha, contents in cases:
                     self._addCaseNames(c, [sha])
                     self._addCaseContents(c, [(sha, contents)])
 
-    def _addCaseNames(self, cursor, casenames):
+    def _addCaseNames(self, cursor, casenames: Iterable[str]) -> None:
         cursor.executemany('INSERT INTO cases (sha1) '
                            'SELECT %s WHERE NOT EXISTS (' +
                            '    SELECT 1 FROM cases WHERE sha1=%s)',
                            ((x, x) for x in casenames))
 
-    def _addCaseContents(self, cursor, cases):
+    def _addCaseContents(self, cursor,
+                         cases: List[Tuple[str, bytes]]) -> None:
         cursor.executemany(
             'INSERT INTO case_contents (case_id, z_contents) ' +
             '    (SELECT id, %s ' +
@@ -155,7 +175,7 @@ class TriageDb(object):
             '         WHERE case_sizes.case_id=id))',
             ((len(x[1]), x[0]) for x in cases))
 
-    def populateCases(self, cases_path):
+    def populateCases(self, cases_path: str) -> None:
         case_files = os.listdir(cases_path)
         case_names = [sha for sha, cpp in [x.split('.') for x in case_files]]
         #print('Adding names...')
@@ -168,7 +188,7 @@ class TriageDb(object):
                     c, ((sha, readFile(os.path.join(cases_path, fname)))
                         for sha, fname in zip(case_names, case_files)))
 
-    def iterateCases(self):
+    def iterateCases(self) -> Iterable[Tuple[str, bytes]]:
         'Iterate through (sha1, contents) pairs.'
         with self.conn:
             c = self.conn.cursor()
@@ -178,20 +198,21 @@ class TriageDb(object):
                       'ORDER BY case_sizes.size')
             return ((x[0], zlib.decompress(x[1])) for x in c)
 
-    def iterateDistinctReduced(self):
+    def iterateDistinctReduced(self) -> Iterable[bytes]:
         with self.conn:
             c = self.conn.cursor()
             c.execute('SELECT DISTINCT contents FROM creduced_contents')
             return (x[0] for x in c)
 
-    def getNumberOfCases(self):
+    def getNumberOfCases(self) -> int:
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT count(*) from case_contents')
                 return c.fetchone()[0]
 
-    def _addTestRun(self, versions, start_time, end_time, results):
-        'Returns id of test run that can be passed to _testRunFinished().'
+    def _addTestRun(self, versions: Dict[str, int],
+                    start_time: int, end_time: int,
+                    results: Iterable[Tuple[str, str]]) -> None:
         assert 'clang' in versions, versions
         assert 'llvm' in versions, versions
         clang_version = versions['clang']
@@ -205,12 +226,17 @@ class TriageDb(object):
                     (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)
+                # delete changed creduce results where new result != OK
+                c.execute("DELETE FROM creduced_cases " +
+                          "SELECT case_id FROM changed_results " +
+                          "    WHERE new<>'ok'")
 
     def testRun(self, versions):
         'A context manager for test runs.'
         return TriageDb.TestRunContext(self, versions)
 
-    def _addResults(self, cursor, run_id, results):
+    def _addResults(self, cursor, run_id: int,
+                    results: Iterable[Tuple[str, str]]) -> None:
         'results: [(sha, result_string)]'
         c = cursor
         # insert result strings if they do not already exist
@@ -225,7 +251,8 @@ class TriageDb(object):
                       '     WHERE cases.sha1=%s AND str=%s)',
                       [(run_id, x[0], x[1]) for x in results])
 
-    def getLastRunTimeByVersions(self, versions):
+    def getLastRunTimeByVersions(
+            self, versions: Dict[str, str]) -> Tuple[int, int]:
         '''Returns (start_time, end_time) of the test run with these versions.
            If no test has been run with this version, returns None.'''
         assert 'clang' in versions, versions
@@ -243,7 +270,7 @@ class TriageDb(object):
                           'LIMIT 1', (clang_version, llvm_version))
                 return c.fetchone()
 
-    def getCReduceWork(self):
+    def getCReduceWork(self) -> Tuple[str, bytes]:
         'Get (sha, content) pair to run through creduce. None if none.'
         with self.conn:
             with self.conn.cursor() as c:
@@ -255,7 +282,8 @@ class TriageDb(object):
             return None
         return (r[0], zlib.decompress(r[1]))
 
-    def addCReduced(self, versions, sha, result, contents=None):
+    def addCReduced(self, versions: Dict[str, str], sha: str,
+                    result: bytes, contents: bytes=None) -> None:
         if result == CReduceResult.ok:
             assert contents, 'Result OK but no contents?'
         else:
@@ -298,7 +326,7 @@ class TriageDb(object):
                                     self.start_time, int(time.time()),
                                     self.results)
 
-        def addResult(self, sha, result_string):
+        def addResult(self, sha: str, result_string: str) -> None:
             self.results.append((sha, result_string))
 
 
@@ -310,7 +338,7 @@ def test(db):
 def main():
     db = TriageDb()
     #db.createSchema()
-    db.populateCases(POPULATE_FROM)
+    #db.populateCases(POPULATE_FROM)
 
     test(db)
 
