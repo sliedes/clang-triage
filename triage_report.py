@@ -166,10 +166,11 @@ class TestRun:
         changed_fails = group_changed_failures(
             changed_fails, self.reduced_dict, self.reduced_sizes)
 
-        fails = [build_failure_context(
-            x[0][0], x[0][1], x[1],
-            [self.reduced_dict.get(y) for y in x[1]])
-                 for x in changed_fails]
+        fails = [
+            build_failure_context(
+                x[0][0], x[0][1], x[1],
+                [self.reduced_dict.get(y) for y in x[1]])
+            for x in changed_fails]
 
         d = {'id': self.run_id,
              'date': asctime(time.localtime(self.start_time)),

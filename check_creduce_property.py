@@ -5,6 +5,7 @@ import sys
 import os
 import typing
 
+
 def read_or_die(fname: str) -> bytes:
     try:
         with open(fname, 'rb') as f:
