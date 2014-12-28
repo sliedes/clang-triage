@@ -44,7 +44,7 @@ def run_creduce(data, reason):
             return None
         with open(cpp_fname, 'rb') as f:
             reduced = f.read()
-    reduced_reason = test_input(reduced)
+    reduced_reason, output = test_input(reduced)
     if reason != reduced_reason:
         print('CReduced case produces different result: {} != {}'.format(
             reduced_reason, reason), file=sys.stderr)
@@ -64,7 +64,7 @@ def try_remove_nonprintables(contents, reason):
             else:
                 tail = b''
             for replacement in [b'', b' ', b'_']:
-                r = test_input(reduced + replacement + tail)
+                r, out = test_input(reduced + replacement + tail)
                 if r == reason:
                     reduced += replacement
                     break
@@ -73,7 +73,7 @@ def try_remove_nonprintables(contents, reason):
                 reduced += contents[i:i+1]
         else:
             reduced += contents[i:i+1]
-    assert test_input(contents) == test_input(reduced)
+    assert test_input(contents)[0] == test_input(reduced)[0]
     return reduced
 
 
@@ -86,7 +86,7 @@ def reduce_one(data, reason):
 
 def main():
     data = sys.stdin.buffer.read()
-    print(reduce_one(data, test_input(data)))
+    print(reduce_one(data, test_input(data)[0]))
 
 if __name__ == '__main__':
     main()

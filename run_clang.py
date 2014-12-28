@@ -49,4 +49,4 @@ def test_input(data, extra_params=[]):
                    stderr=subp.STDOUT, cwd='/')
     stdout = p.communicate(data)[0]
     retval = p.returncode
-    return check_for_clang_crash(stdout, retval), output
+    return check_for_clang_crash(stdout, retval), stdout

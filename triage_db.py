@@ -4,6 +4,7 @@ import psycopg2 as pg
 import os
 import time
 import zlib
+import sys
 from enum import Enum
 
 from config import DB_NAME, POPULATE_FROM
@@ -132,6 +133,11 @@ def readFile(path):
 class TriageDb(object):
     def __init__(self):
         self.conn = pg.connect('dbname=' + DB_NAME)
+        with self.conn:
+            with self.conn.cursor() as c:
+                c.execute("SELECT id FROM result_strings " +
+                          "WHERE str='OK'")
+                self.OK_ID = c.fetchone()[0]
 
     def createSchema(self):
         with self.conn:
@@ -229,9 +235,10 @@ class TriageDb(object):
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)
                 # delete changed creduce results where new result != OK
-                c.execute("DELETE FROM creduced_cases " +
-                          "SELECT case_id FROM changed_results " +
-                          "    WHERE new<>'ok'")
+                c.execute("DELETE FROM creduced_cases WHERE original IN (" +
+                          "    SELECT case_id FROM changed_results " +
+                          "    WHERE new<>%s)",
+                          (self.OK_ID, ))
 
     def testRun(self, versions):
         'A context manager for test runs.'
@@ -257,10 +264,10 @@ class TriageDb(object):
 
         c.executemany('DELETE FROM outputs ' +
                       'WHERE case_id=(SELECT id FROM cases WHERE sha1=%s)',
-                      (x[0] for x in outputs))
-        c.executemany('INSERT INTO outputs VALUES (case_id, output) ' +
+                      ((x[0],) for x in outputs))
+        c.executemany('INSERT INTO outputs ' +
                       'SELECT id, %s FROM cases WHERE sha1=%s',
-                      ((zlib.compress(x[1]), x[0]) for x in outputs))
+                      [(zlib.compress(x[1]), x[0]) for x in outputs])
 
     def getLastRunTimeByVersions(self, versions):
         '''Returns (start_time, end_time) of the test run with these versions.
