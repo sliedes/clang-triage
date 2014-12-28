@@ -11,10 +11,6 @@ Triage engine
   affect them (the versions used are stored in the database, but
   nothing is done with them). Figure out the right way of using it.
 
-* Whenever there is a new failure, remove that case from
-  creduced_cases if the previous result is 'no_crash', triggering new
-  reduce.
-
 * A more language-agnostic and clang-dependent way of reducing test
   cases, in addition to creduce?
 
@@ -35,6 +31,8 @@ Report
   more clever
 
 * Show failed reduces?
+
+* Group failure changes by (old, new)
 
 Tools
 =====
