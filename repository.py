@@ -77,6 +77,7 @@ def update_all(versions, idle_func=const(False)):
     for proj, path in PROJECTS.items():
         git_pull(path)
     LAST_UPDATED = time.time()
+    return True
 
 
 def get_versions():
@@ -90,12 +91,18 @@ def get_versions():
 
 
 def build():
-    subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
+    try:
+        subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
+    except subp.CalledProcessError as e:
+        print('Ninja build failed.', file=sys.stderr)
+        return False
+    return True
 
 
 def update_and_build(idle_func=const(False)):
     versions = get_versions()
     print('Version: ' + str(versions))
-    update_all(versions, idle_func)
+    if not update_all(versions, idle_func):
+        return False
     print('Version: ' + str(get_versions()))
-    build()
+    return build()

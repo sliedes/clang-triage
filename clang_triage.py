@@ -5,12 +5,13 @@ import subprocess as subp
 import time
 
 from triage_db import TriageDb, CReduceResult
-from repository import update_and_build, get_versions
+from repository import update_and_build, get_versions, build
 from run_clang import test_input
 from run_creduce import reduce_one
+from dumb_reduce import dumb_reduce
 
 
-def creduce_worker_one_iter(db, versions):
+def reduce_worker_one_iter(db, versions):
     work = db.getCReduceWork()
     if not work:
         return None
@@ -24,17 +25,25 @@ def creduce_worker_one_iter(db, versions):
         return True
     reduced = reduce_one(contents, reason)
     if not reduced is None:
-        print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)))
+        print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
+              file=sys.stderr)
         db.addCReduced(versions, sha, CReduceResult.ok, reduced)
     else:
-        db.addCReduced(versions, sha, CReduceResult.failed)
+        # creduce failed, run dumb reduce that does not fail
+        print('Running dumb reducer...', file=sys.stderr)
+        reduced = dumb_reduce(contents)
+        print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
+              file=sys.stderr)
+        db.addCReduced(versions, sha, CReduceResult.ok, reduced)
     return True
 
 
 def update_and_check_if_should_run(db):
     versions = get_versions()
-    idle_func = lambda: creduce_worker_one_iter(db, versions)
-    update_and_build(idle_func)  # sleeps or runs creduce
+    idle_func = lambda: reduce_worker_one_iter(db, versions)
+    if not update_and_build(idle_func):
+        print('Update or build failed. Skipping test.', file=sys.stderr)
+        return False
     versions = get_versions()
 
     lastRun = db.getLastRunTimeByVersions(versions)
@@ -56,8 +65,13 @@ def test_iter(start_from_current=False):
 
     db = TriageDb()
 
-    if not start_from_current and not update_and_check_if_should_run(db):
-        return False
+    if start_from_current:
+        if not build():
+            start_from_current = False
+
+    if not start_from_current:
+        if not update_and_check_if_should_run(db):
+            return False
 
     versions = get_versions()
 

@@ -16,19 +16,20 @@ REDUCED_DICT = None
 REDUCED_SHA_DICT = None
 OUTPUT_SHA_DICT = None
 
+
 def fetch_reduced_dict(db):
     global REDUCED_DICT, REDUCED_SHA_DICT
     with db.cursor() as c:
         c.execute('SELECT sha1, contents FROM sha_reduced_view ')
         REDUCED_DICT = dict(c.fetchall())
     REDUCED_SHA_DICT = dict((k, sha1(v).hexdigest())
-                            for (k,v) in REDUCED_DICT.items())
+                            for (k, v) in REDUCED_DICT.items())
 
 
 def fetch_output_dict(db):
     global OUTPUT_SHA_DICT
     with db.cursor() as c:
-        c.execute('SELECT sha1, output FROM sha_output_view');
+        c.execute('SELECT sha1, output FROM sha_output_view')
         OUTPUT_SHA_DICT = dict(
             (x[0], sha1(zlib.decompress(x[1])).hexdigest())
             for x in c.fetchall())

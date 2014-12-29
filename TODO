@@ -1,16 +1,11 @@
 Triage engine
 =============
 
-* Use multidelta as a fallback reducer
-
 * Detect hangs
 
 * CReduced cases are now treated as if the llvm/clang versions don't
   affect them (the versions used are stored in the database, but
   nothing is done with them). Figure out the right way of using it.
-
-* A more language-agnostic and clang-dependent way of reducing test
-  cases, in addition to creduce?
 
 * Do the triage runs in parallel
 
@@ -30,6 +25,11 @@ Report
 
 * Show failed reduces?
 
+* Split report generation: First part queries the DB and outputs JSON,
+  the other part reads the JSON and generates the report
+
+* Figure out a better templating engine (for xhtml) than pystache
+
 Tools
 =====
 
@@ -45,4 +45,8 @@ Misc
 * Also import those of the cases that afl designated as hangs that
   actually are hangs
 
-* Test framework
+* Some kind of test framework
+
+* Rename export_blobs to export_cases
+
+* Maybe parallelize the dumb reductions?
