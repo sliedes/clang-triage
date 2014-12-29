@@ -1,8 +1,6 @@
 Triage engine
 =============
 
-* Backtraces
-
 * Use multidelta as a fallback reducer
 
 * Detect hangs
@@ -48,5 +46,3 @@ Misc
   actually are hangs
 
 * Test framework
-
-* Obsolete CReduced cases are now not removed from tarball

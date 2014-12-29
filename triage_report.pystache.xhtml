@@ -42,8 +42,10 @@
       <b>New:</b> {{reason}}<br/>
       <b>Cases:</b> (num={{numCases}})<br/>
       {{#cases}}
-      <a href="{{url}}" class="mo">{{shortCase}}</a>{{#haveReduced}}<a href="{{reducedUrl}}">
-	<small>(reduced)</small></a>{{/haveReduced}}{{^isLast}}, {{/isLast}}
+      <a href="{{url}}" class="mo">{{shortCase}}</a>{{#haveReduced}}
+      <a href="{{reducedUrl}}">
+	<small>(reduced)</small></a>{{/haveReduced}}{{#haveOutput}}
+      <a href="{{outputUrl}}"><small>(output)</small></a>{{/haveOutput}}{{^isLast}}, {{/isLast}}
       {{/cases}}{{#ellipsis}}...{{/ellipsis}}
     </p>
     {{/newFailures}}
@@ -64,8 +66,10 @@
     {{#failures}}
     <p><b>{{reason}}</b></p>
     <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
-    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{#haveReduced}}<a href="{{reducedUrl}}">
-	<small>(reduced)</small></a>{{/haveReduced}}{{^isLast}}, {{/isLast}}
+    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{#haveReduced}}
+      <a href="{{reducedUrl}}">
+	<small>(reduced)</small></a>{{/haveReduced}}{{#haveOutput}}
+      <a href="{{outputUrl}}"><small>(output)</small></a>{{/haveOutput}}{{^isLast}}, {{/isLast}}
       {{/cases}}
     {{#ellipsis}}...{{/ellipsis}}</p> <hr/> {{/failures}}
     {{^failures}}

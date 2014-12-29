@@ -28,7 +28,7 @@ CREATE TYPE creduce_result AS ENUM ('ok', 'failed', 'no_crash');
 
 CREATE TABLE creduced_cases (
     id BIGSERIAL PRIMARY KEY,
-    original BIGINT NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
+    original BIGINT UNIQUE NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
     clang_version INTEGER NOT NULL,
     llvm_version INTEGER NOT NULL,
     result creduce_result NOT NULL);
@@ -65,7 +65,7 @@ CREATE TABLE results (
     case_id BIGINT NOT NULL,
     test_run BIGINT NOT NULL,
     result BIGINT NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES case_contents(case_id) ON UPDATE CASCADE,
     FOREIGN KEY(test_run) REFERENCES test_runs(id) ON UPDATE CASCADE,
     FOREIGN KEY(result) REFERENCES result_strings(id) ON UPDATE CASCADE);
 CREATE INDEX results_case_id ON results(case_id);
@@ -85,20 +85,31 @@ CREATE VIEW unreduced_cases_view AS
         SELECT * FROM creduced_cases AS red
         WHERE red.original = cv.id);
 
-CREATE VIEW failures_view AS
+CREATE VIEW results_view AS
     SELECT test_run, cases.id, sha1, str
     FROM result_strings AS res, results, cases
     WHERE results.case_id = cases.id
         AND results.result = res.id;
 
-CREATE VIEW failures_with_reduced_view AS
-    SELECT test_run, id, sha1, str, cr.contents AS reduced
-    FROM failures_view LEFT OUTER JOIN (
+CREATE VIEW results_with_reduced_plus_output_view AS
+    SELECT test_run, id, sha1, str, cr.contents, output AS reduced
+    FROM results_view LEFT OUTER JOIN (
         SELECT DISTINCT ON (original) original, con.contents
         FROM creduced_cases AS cas, creduced_contents AS con
         WHERE con.creduced_id = cas.id) AS cr
-    ON (cr.original = id), case_contents
-    WHERE id = case_contents.case_id;
+    ON (cr.original = id), case_contents, outputs
+    WHERE id = case_contents.case_id AND id = outputs.case_id;
+
+CREATE VIEW sha_reduced_view AS
+    SELECT sha1, contents
+    FROM cases, creduced_cases, creduced_contents
+    WHERE cases.id = creduced_cases.original
+        AND creduced_cases.id = creduced_contents.creduced_id;
+
+CREATE VIEW sha_output_view AS
+    SELECT sha1, output
+    FROM cases, outputs
+    WHERE cases.id = outputs.case_id;
 
 CREATE VIEW last_2_runs_view AS
     SELECT id FROM test_runs
@@ -202,7 +213,7 @@ class TriageDb(object):
             c = self.conn.cursor()
             c.execute('SELECT cc.sha1, cc.z_contents ' +
                       'FROM case_view AS cc, case_sizes '
-                      'WHERE case_sizes.case_id = cc.id ' +
+<                      'WHERE case_sizes.case_id = cc.id ' +
                       'ORDER BY case_sizes.size')
             return ((x[0], zlib.decompress(x[1])) for x in c)
 

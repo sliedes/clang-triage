@@ -4,11 +4,34 @@ import psycopg2 as pg
 import pystache
 import time
 from hashlib import sha1
+import zlib
 
 from config import DB_NAME
 
 # show at most this many failing cases per reason
 MAX_SHOW_CASES = 20
+
+
+REDUCED_DICT = None
+REDUCED_SHA_DICT = None
+OUTPUT_SHA_DICT = None
+
+def fetch_reduced_dict(db):
+    global REDUCED_DICT, REDUCED_SHA_DICT
+    with db.cursor() as c:
+        c.execute('SELECT sha1, contents FROM sha_reduced_view ')
+        REDUCED_DICT = dict(c.fetchall())
+    REDUCED_SHA_DICT = dict((k, sha1(v).hexdigest())
+                            for (k,v) in REDUCED_DICT.items())
+
+
+def fetch_output_dict(db):
+    global OUTPUT_SHA_DICT
+    with db.cursor() as c:
+        c.execute('SELECT sha1, output FROM sha_output_view');
+        OUTPUT_SHA_DICT = dict(
+            (x[0], sha1(zlib.decompress(x[1])).hexdigest())
+            for x in c.fetchall())
 
 
 # RFC 2822
@@ -22,16 +45,13 @@ def asctime(t=None):
 
 def fetch_failures(db, run_id):
     with db.cursor() as c:
-        c.execute('SELECT sha1, str, reduced ' +
-                  'FROM failures_with_reduced_view ' +
+        c.execute('SELECT sha1, str FROM results_view ' +
                   'WHERE test_run=%s', (run_id, ))
         results = c.fetchall()
     fails_dict = dict([(x[0], x[1]) for x in results])
-    reduced_dict = dict([(x[0], sha1(x[2]).hexdigest())
-                         for x in results if x[2]])
-    reduced_sizes = dict([(x[0], len(x[2]))
-                          for x in results if x[2]])
-    return fails_dict, reduced_dict, reduced_sizes
+    reduced_sizes = dict([(x[0], len(REDUCED_DICT[x[0]]))
+                          for x in results if x[0] in REDUCED_DICT])
+    return fails_dict, reduced_sizes
 
 
 def get_reduce_queue_size(db):
@@ -61,23 +81,25 @@ def get_num_reduce_failed(db):
         return c.fetchone()[0]
 
 
-def case_dict(sha, reduced=None):
+def case_dict(sha):
+    reduced = REDUCED_SHA_DICT.get(sha)
+    output = OUTPUT_SHA_DICT.get(sha)
     d = {'case': sha, 'shortCase': sha[0:6],
          'url': 'sha/{}/{}/{}.cpp'.format(sha[0], sha[1], sha),
-         'haveReduced': bool(reduced), 'isLast': False}
+         'haveReduced': bool(reduced), 'isLast': False,
+         'haveOutput': bool(output)}
     if reduced:
         d['reducedUrl'] = 'cr/{}/{}/{}.cpp'.format(
             reduced[0], reduced[1], reduced)
+    if output:
+        d['outputUrl'] = 'out/{}/{}/{}.txt'.format(
+            output[0], output[1], output)
     return d
 
 
 # FIXME reduced cases
-def build_failure_context(reason, old_reason, cases, reduced=None):
-    if reduced:
-        cases = zip(cases, reduced)
-    else:
-        cases = [(x, None) for x in cases]
-    ds = [case_dict(*case) for case in cases]
+def build_failure_context(reason, old_reason, cases):
+    ds = [case_dict(case) for case in cases]
     ds[-1]['isLast'] = True
     num_cases = len(ds)
     ellipsis = False
@@ -98,8 +120,8 @@ def split_by(pred, xs):
     return a
 
 
-def sort_cases(cases, reduced_dict, reduced_sizes):
-    not_reduced, reduced = split_by(lambda x: x in reduced_dict, cases)
+def sort_cases(cases, reduced_sizes):
+    not_reduced, reduced = split_by(lambda x: x in REDUCED_DICT, cases)
     not_reduced.sort()
 
     # sort reduced by size, sha
@@ -110,7 +132,7 @@ def sort_cases(cases, reduced_dict, reduced_sizes):
     duplicate_reduced = []
     seen = set()
     for x in reduced:
-        red = reduced_dict[x]
+        red = REDUCED_DICT[x]
         if red in seen:
             duplicate_reduced.append(x)
         else:
@@ -120,7 +142,7 @@ def sort_cases(cases, reduced_dict, reduced_sizes):
     return unique_reduced + not_reduced + duplicate_reduced
 
 
-def group_changed_failures(changed_fails, reduced_dict, reduced_sizes):
+def group_changed_failures(changed_fails, reduced_sizes):
     'changed_fails: [(sha1, reason, prev_reason)]'
 
     groups = {}
@@ -131,7 +153,7 @@ def group_changed_failures(changed_fails, reduced_dict, reduced_sizes):
         groups[rt].append(sha1)
 
     for x in groups:
-        groups[x] = sort_cases(groups[x], reduced_dict, reduced_sizes)
+        groups[x] = sort_cases(groups[x], reduced_sizes)
 
     return sorted(groups.items(), key=lambda x: (x[0][1], x[0][0], x[1]))
 
@@ -144,8 +166,7 @@ class TestRun:
         self.end_time = end_time
         self.clang_ver = clang_ver
         self.llvm_ver = llvm_ver
-        self.fails_dict, self.reduced_dict, self.reduced_sizes = (
-            fetch_failures(db, run_id))
+        self.fails_dict, self.reduced_sizes = fetch_failures(db, run_id)
         self.version = 'clang {}, llvm {}'.format(clang_ver, llvm_ver)
 
     def ctx(self, prev=None):
@@ -164,13 +185,10 @@ class TestRun:
 
         # group changed failures by (old, new)
         changed_fails = group_changed_failures(
-            changed_fails, self.reduced_dict, self.reduced_sizes)
+            changed_fails, self.reduced_sizes)
 
-        fails = [
-            build_failure_context(
-                x[0][0], x[0][1], x[1],
-                [self.reduced_dict.get(y) for y in x[1]])
-            for x in changed_fails]
+        fails = [build_failure_context(x[0][0], x[0][1], x[1])
+                 for x in changed_fails]
 
         d = {'id': self.run_id,
              'date': asctime(time.localtime(self.start_time)),
@@ -189,6 +207,8 @@ def main():
 
     db = pg.connect('dbname=' + DB_NAME)
     with db:
+        fetch_reduced_dict(db)
+        fetch_output_dict(db)
         with db.cursor() as c:
             c.execute('SELECT id, start_time, end_time, clang_version, ' +
                       '    llvm_version ' +
@@ -234,14 +254,13 @@ def main():
         del failures['OK']
 
     # sort cases by size of reduced, secondarily by sha1
-    failures = [(x[0], sort_cases(x[1], last_run.reduced_dict,
-                                  last_run.reduced_sizes))
+    failures = [(x[0], sort_cases(x[1], last_run.reduced_sizes))
                 for x in failures.items()]
     # sort by number of test cases triggering the crash
     failures.sort(key=lambda x: len(x[1]), reverse=True)
 
     failures = [{'reason': x[0],
-                 'cases': [case_dict(y, last_run.reduced_dict.get(y))
+                 'cases': [case_dict(y)
                            for y in x[1][:MAX_SHOW_CASES]],
                  'numCases': len(x[1]),
                  'plural': len(x[1]) != 1,
