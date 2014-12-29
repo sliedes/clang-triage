@@ -212,8 +212,8 @@ class TriageDb(object):
         with self.conn:
             c = self.conn.cursor()
             c.execute('SELECT cc.sha1, cc.z_contents ' +
-                      'FROM case_view AS cc, case_sizes '
-<                      'WHERE case_sizes.case_id = cc.id ' +
+                      'FROM case_view AS cc, case_sizes ' +
+                      'WHERE case_sizes.case_id = cc.id ' +
                       'ORDER BY case_sizes.size')
             return ((x[0], zlib.decompress(x[1])) for x in c)
 
