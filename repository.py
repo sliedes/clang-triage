@@ -43,13 +43,17 @@ class CommitInfo(object):
 
 
 def git_pull(path):
-    try:
-        subp.check_output(['git', 'pull'], cwd=path)
-    except subp.CalledProcessError as e:
-        print('git pull failed with exit code %d.' % e.returncode,
-              file=sys.stderr)
-        print('Output was:\n' + e.output.decode('utf-8'), file=sys.stderr)
-        raise
+    success = False
+    while not success:
+        try:
+            subp.check_output(['git', 'pull'], cwd=path)
+            success = True
+        except subp.CalledProcessError as e:
+            print('git pull failed with exit code %d.' % e.returncode,
+                  file=sys.stderr)
+            print('Output was:\n' + e.output.decode('utf-8'), file=sys.stderr)
+            print('Trying again after 30 seconds...', file=sys.stderr)
+            time.sleep(30)
 
 
 LAST_UPDATED = 0
