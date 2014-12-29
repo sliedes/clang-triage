@@ -6,7 +6,7 @@ from sha_file_tree import make_sha_tree
 
 def main():
     db = TriageDb()
-    make_sha_tree('cr', db.iterateDistinctReduced(), rm_old=True)
+    make_sha_tree('cr', db.iterateDistinctReduced(), suffix='.cpp', rm_old=True)
 
 
 if __name__ == '__main__':

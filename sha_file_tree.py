@@ -25,7 +25,7 @@ def looks_like_sha_tree(path):
     return True
 
 
-def make_sha_tree(path, contentses, rm_old=False):
+def make_sha_tree(path, contentses, suffix='', rm_old=False):
     'Make a two-level sha tree rooted on path.'
 
     if rm_old and os.path.isdir(path):
@@ -41,7 +41,7 @@ def make_sha_tree(path, contentses, rm_old=False):
 
     for contents in contentses:
         sha = sha1(contents).hexdigest()
-        fname = os.path.join(path, sha[0], sha[1], sha)
+        fname = os.path.join(path, sha[0], sha[1], sha) + suffix
         if not os.path.exists(fname):
             with open(fname, 'wb') as f:
                 f.write(contents)

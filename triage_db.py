@@ -212,6 +212,12 @@ class TriageDb(object):
             c.execute('SELECT DISTINCT contents FROM creduced_contents')
             return (x[0] for x in c)
 
+    def iterateOutputs(self):
+        with self.conn:
+            c = self.conn.cursor()
+            c.execute('SELECT output FROM outputs')
+            return (zlib.decompress(x[0]) for x in c)
+
     def getNumberOfCases(self):
         with self.conn:
             with self.conn.cursor() as c:
