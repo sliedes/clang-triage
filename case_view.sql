@@ -23,7 +23,8 @@ ALTER TABLE case_contents ADD CONSTRAINT case_contents_case_id_forward_fkey
     FOREIGN KEY (case_id) REFERENCES case_sizes (case_id)
         ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE;
 
--- Inserts into the three 1:1 case tables can be done via case_view
+-- Inserts into and deletes from the three 1:1 case tables can be done
+-- via case_view
 CREATE VIEW case_view AS
     SELECT id, sha1, z_contents, size
     FROM cases, case_contents, case_sizes

@@ -83,6 +83,7 @@ def get_num_distinct_reduced(db):
                   "FROM creduced_contents")
         return c.fetchone()[0]
 
+
 def get_num_runs_completed(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(*) " +
@@ -221,7 +222,7 @@ def main():
     with open('triage_report.pystache.xhtml') as f:
         TEMPLATE = pystache.parse(f.read())
 
-    db = pg.connect('dbname=' + DB_NAME)
+    db = pg.connect(database=DB_NAME)
     with db:
         fetch_reduced_dict(db)
         fetch_output_dict(db)

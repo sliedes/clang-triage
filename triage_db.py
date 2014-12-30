@@ -25,18 +25,12 @@ def readFile(path):
 
 class TriageDb(object):
     def __init__(self):
-        self.conn = pg.connect('dbname=' + DB_NAME)
+        self.conn = pg.connect(database=DB_NAME)
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute("SELECT id FROM result_strings " +
                           "WHERE str='OK'")
                 self.OK_ID = c.fetchone()[0]
-
-    #def createSchema(self):
-    #    with open('schema.sql') as f:
-    #        with self.conn:
-    #            with self.conn.cursor() as c:
-    #                c.execute(f.read())
 
     def doesCaseExist(self, sha):
         with self.conn:
@@ -52,33 +46,10 @@ class TriageDb(object):
         with self.conn:
             with self.conn.cursor() as c:
                 for sha, contents in cases:
-                    self._addCaseNames(c, [sha])
-                    self._addCaseContents(c, [(sha, contents)])
-
-    def _addCaseNames(self, cursor, casenames):
-        cursor.execute('SET CONSTRAINTS cases_id_fkey DEFERRED');
-        cursor.executemany('INSERT INTO cases (sha1) '
-                           'SELECT %s WHERE NOT EXISTS (' +
-                           '    SELECT 1 FROM cases WHERE sha1=%s)',
-                           ((x, x) for x in casenames))
-
-    def _addCaseContents(self, cursor, cases):
-        cursor.execute('SET CONSTRAINTS case_contents_case_id_fkey, ' +
-                       '    case_contents_case_id_fkey2 DEFERRED');
-        cursor.executemany(
-            'INSERT INTO case_contents (case_id, z_contents) ' +
-            '    (SELECT id, %s ' +
-            '     FROM cases ' +
-            '     WHERE sha1=%s AND NOT EXISTS (' +
-            '         SELECT 1 FROM case_contents WHERE case_id=id))',
-            ((zlib.compress(x[1]), x[0]) for x in cases))
-        cursor.executemany(
-            'INSERT INTO case_sizes (case_id, size) ' +
-            '    (SELECT id, %s ' +
-            '     FROM cases WHERE sha1=%s AND NOT EXISTS (' +
-            '         SELECT 1 FROM case_sizes ' +
-            '         WHERE case_sizes.case_id=id))',
-            ((len(x[1]), x[0]) for x in cases))
+                    c.executemany(
+                        'INSERT INTO case_view (sha1, z_contents, size) ' +
+                        'VALUES (?, ?, ?)',
+                        (sha, zlib.compress(contents), len(contents)))
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
