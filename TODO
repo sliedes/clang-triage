@@ -33,6 +33,10 @@ Reducer
 * Sometimes CReduce leaves stray clang_delta processes
   running... figure out what can be done about that.
 
+* Investigate why SIGTERMing (ctrl-c) creduce occasionally results in
+  a failure to remove the creduce tmpdir, indirectly resulting in
+  failure to remove the clang_triage tmpdir
+
 Report
 ======
 
