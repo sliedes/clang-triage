@@ -30,6 +30,9 @@ Reducer
   reducer is run for cases where the result in DB is 'creduce_failed'
   or something.
 
+* Sometimes CReduce leaves stray clang_delta processes
+  running... figure out what can be done about that.
+
 Report
 ======
 
@@ -61,5 +64,3 @@ Misc
   actually are hangs
 
 * Some kind of test framework
-
-* Rename export_blobs to export_cases
