@@ -11,8 +11,12 @@ POPULATE_FROM = '/home/sliedes/scratch/afl/cases.minimized'
 
 NINJA_PARAMS = ['-j8']
 
+# seconds; will wait additional this many seconds for it to terminate
+# after SIGTERM and then kill it
+CLANG_TIMEOUT = 4
+
 # timeout from GNU coreutils
-TIMEOUT_CMD = ['timeout', '-k', '4', '4']
+CLANG_TIMEOUT_CMD = ['timeout', '-k', str(CLANG_TIMEOUT), str(CLANG_TIMEOUT)]
 
 CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-fno-crash-diagnostics', '-xc++', '-c',

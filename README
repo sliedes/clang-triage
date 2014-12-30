@@ -1,0 +1,75 @@
+Introduction
+============
+
+clang-triage is a bot which does, broadly, the following:
+
+* Periodically try to checkout a newer version of llvm and clang
+
+  * If found, build and execute clang for all given test cases
+
+  * Whether new llvm/clang were found or not, generate a HTML report
+
+* When not building clang or executing test cases, see if there are
+  currently failing test cases which have not been reduced; if so, try
+  to reduce them using CReduce. On failure, use a builtin dumber
+  (fast, but produces very terse results) reduction algorithm.
+
+
+Prerequisites
+=============
+
+* python 3 (3.4.2 tested)
+* python3-psycopg2 (2.5.4 tested)
+* postgresql database (9.4 tested)
+* git
+* ninja (the build system)
+* creduce
+* python3-pystache (0.5.4 tested)
+* timeout from GNU coreutils
+
+
+Setup
+=====
+
+* edit config.py to match your setup
+
+* git checkout llvm and tools/clang to LLVM_SRC as specified in config
+
+* Configure LLMV for cmake/ninja build in BUILD
+
+  * Use something like
+
+       cmake ../llvm.src -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
+           -DLLVM_ENABLE_ASSERTIONS=ON -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+	   -DCLANG_ENABLE_ARCMT=OFF -GNinja
+
+* Run ninja in the BUILD dir for an initial build
+
+* Create a database with the name in DB_NAME and grant yourself the
+  rights to it.
+
+  * For example: as postgres (the postgresql superuser), run psql and
+    issue the following SQL statements (assuming your username is
+    joeuser and your postgres is configured, as it is at least in
+    Debian, to match Unix usernames to postgres usernames):
+
+      CREATE ROLE clang_triage;
+      CREATE USER joeuser IN ROLE clang_triage;
+      CREATE DATABASE clang_triage OWNER clang_triage;
+
+* Create the schema (database tables) by running (as joeuser) the command
+
+      psql clang_triage -f create_schema.sql
+
+    * This should not output any errors
+
+* Populate the database with the cases by putting them in
+  POPULATE_FROM (all in the same directory) and running triage_db.py.
+
+* For report generation, clang_triage periodically runs
+  update-hook.sh. Edit that script (at least) to change the paths to
+  where you want the report to live. If you don't have pbzip2, change
+  it to regular bzip2 (or to some other compressor, but then you will
+  have to edit the paths in triage_report.pystache.xhtml too).
+
+* Now you should be ready to run the bot: run clang_triage.py.

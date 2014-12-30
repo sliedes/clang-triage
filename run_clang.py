@@ -2,8 +2,8 @@ import subprocess as subp
 import os
 import time
 
-from config import (
-    MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS)
+from config import MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY
+from config import CLANG_PARAMS, CLANG_TIMEOUT_CMD
 
 
 def save_data(prefix, data):
@@ -43,7 +43,7 @@ def check_for_clang_crash(output, retval):
 
 
 def test_input(data, extra_params=[]):
-    CMD = TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
+    CMD = CLANG_TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
     p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
                    stderr=subp.STDOUT, cwd='/')
     stdout = p.communicate(data)[0]

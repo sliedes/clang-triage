@@ -5,6 +5,7 @@ import os
 import time
 import zlib
 import sys
+import hashlib
 from enum import Enum
 
 from config import DB_NAME, POPULATE_FROM
@@ -45,24 +46,22 @@ class TriageDb(object):
     def addCases(self, cases):
         with self.conn:
             with self.conn.cursor() as c:
-                for sha, contents in cases:
-                    c.executemany(
-                        'INSERT INTO case_view (sha1, z_contents, size) ' +
-                        'VALUES (?, ?, ?)',
-                        (sha, zlib.compress(contents), len(contents)))
+                c.executemany(
+                    'INSERT INTO case_view (sha1, z_contents, size) ' +
+                    'VALUES (%s, %s, %s)',
+                    ((x[0], zlib.compress(x[1]), len(x[1]))
+                     for x in cases))
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
-        case_names = [sha for sha, cpp in [x.split('.') for x in case_files]]
-        #print('Adding names...')
-        with self.conn:
-            with self.conn.cursor() as c:
-                self._addCaseNames(c, case_names)
 
-                # FIXME calculate sha1
-                self._addCaseContents(
-                    c, ((sha, readFile(os.path.join(cases_path, fname)))
-                        for sha, fname in zip(case_names, case_files)))
+        def cases_iter():
+            for fname in case_files:
+                contents = readFile(os.path.join(cases_path, fname))
+                sha = hashlib.sha1(contents).hexdigest()
+                yield (sha, contents)
+
+        self.addCases(cases_iter())
 
     def iterateCases(self):
         'Iterate through (sha1, contents) pairs.'
@@ -221,16 +220,9 @@ class TriageDb(object):
             self.results.append((sha, result_string, output))
 
 
-def test(db):
-    for name, contents in db.iterateCases():
-        print((name, len(contents)))
-
-
 def main():
     db = TriageDb()
     db.populateCases(POPULATE_FROM)
-
-    test(db)
 
 
 if __name__ == '__main__':
