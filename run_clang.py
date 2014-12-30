@@ -1,7 +1,6 @@
 import subprocess as subp
 import os
 import time
-import typing
 
 from config import (
     MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY, CLANG_PARAMS)

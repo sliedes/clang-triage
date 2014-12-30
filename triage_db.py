@@ -17,117 +17,6 @@ class CReduceResult(Enum):
     no_crash = 3
     dumb = 4
 
-_CREATE_TABLES_SQL = '''
-CREATE TABLE cases (
-    id BIGSERIAL PRIMARY KEY,
-    sha1 TEXT UNIQUE NOT NULL);
-
-CREATE TABLE case_contents (
-    case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE,
-    z_contents BYTEA NOT NULL);
-
-CREATE TYPE creduce_result AS ENUM ('ok', 'dumb', 'no_crash');
-
-CREATE TABLE creduced_cases (
-    id BIGSERIAL PRIMARY KEY,
-    original BIGINT UNIQUE NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
-    clang_version INTEGER NOT NULL,
-    llvm_version INTEGER NOT NULL,
-    result creduce_result NOT NULL);
-CREATE UNIQUE INDEX creduced_cases_original_versions_unique
-ON creduced_cases (original, clang_version, llvm_version);
-
-CREATE TABLE creduced_contents (
-    creduced_id BIGINT NOT NULL
-        REFERENCES creduced_cases(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    contents BYTEA NOT NULL);
-
-CREATE TABLE case_sizes (
-    case_id BIGINT PRIMARY KEY,
-    size INTEGER NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE);
-CREATE INDEX case_sizes_size ON case_sizes(size);
-
-CREATE TABLE test_runs (
-    id BIGSERIAL PRIMARY KEY,
-    start_time BIGINT NOT NULL,
-    end_time BIGINT NOT NULL,
-    clang_version INTEGER NOT NULL,
-    llvm_version INTEGER NOT NULL);
-CREATE INDEX test_runs_start_time ON test_runs(start_time);
-CREATE UNIQUE INDEX test_runs_versions
-    ON test_runs(clang_version, llvm_version);
-
-CREATE TABLE result_strings (
-    id BIGSERIAL PRIMARY KEY,
-    str TEXT UNIQUE NOT NULL);
-
-CREATE TABLE results (
-    id BIGSERIAL PRIMARY KEY,
-    case_id BIGINT NOT NULL,
-    test_run BIGINT NOT NULL,
-    result BIGINT NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES case_contents(case_id) ON UPDATE CASCADE,
-    FOREIGN KEY(test_run) REFERENCES test_runs(id) ON UPDATE CASCADE,
-    FOREIGN KEY(result) REFERENCES result_strings(id) ON UPDATE CASCADE);
-CREATE INDEX results_case_id ON results(case_id);
-CREATE INDEX results_test_run ON results(test_run);
-CREATE INDEX results_result ON results(result);
-CREATE UNIQUE INDEX results_case_id_test_run ON results(case_id, test_run);
-
-CREATE VIEW case_view AS
-    SELECT id, sha1, z_contents
-    FROM cases, case_contents
-    WHERE cases.id = case_contents.case_id;
-
-CREATE VIEW unreduced_cases_view AS
-    SELECT sha1, z_contents
-    FROM case_view AS cv
-    WHERE NOT EXISTS (
-        SELECT * FROM creduced_cases AS red
-        WHERE red.original = cv.id);
-
-CREATE VIEW results_view AS
-    SELECT test_run, cases.id, sha1, str
-    FROM result_strings AS res, results, cases
-    WHERE results.case_id = cases.id
-        AND results.result = res.id;
-
-CREATE TABLE outputs (
-   case_id BIGINT UNIQUE REFERENCES cases(id)
-       ON UPDATE CASCADE ON DELETE CASCADE,
-   output BYTEA NOT NULL);
-
-CREATE VIEW sha_reduced_view AS
-    SELECT sha1, contents
-    FROM cases, creduced_cases, creduced_contents
-    WHERE cases.id = creduced_cases.original
-        AND creduced_cases.id = creduced_contents.creduced_id;
-
-CREATE VIEW sha_output_view AS
-    SELECT sha1, output
-    FROM cases, outputs
-    WHERE cases.id = outputs.case_id;
-
-CREATE VIEW last_2_runs_view AS
-    SELECT id FROM test_runs
-    ORDER BY id DESC LIMIT 2;
-
-CREATE VIEW last_run_results AS
-    SELECT * FROM results
-    WHERE test_run=(SELECT MAX(id) FROM last_2_runs_view);
-
-CREATE VIEW second_last_run_results AS
-    SELECT * FROM results
-    WHERE test_run=(SELECT MIN(id) FROM last_2_runs_view);
-
-CREATE VIEW changed_results AS
-    SELECT last.id AS id1, second.id AS id2, last.case_id,
-        last.result AS new, second.result AS old
-    FROM last_run_results AS last, second_last_run_results AS second
-    WHERE last.case_id=second.case_id AND last.result<>second.result;
-'''.strip()
-
 
 def readFile(path):
     with open(path, 'rb') as f:
@@ -136,21 +25,12 @@ def readFile(path):
 
 class TriageDb(object):
     def __init__(self):
-        self.conn = pg.connect('dbname=' + DB_NAME)
+        self.conn = pg.connect(database=DB_NAME)
         with self.conn:
             with self.conn.cursor() as c:
-                try:
-                    c.execute("SELECT id FROM result_strings " +
-                              "WHERE str='OK'")
-                    self.OK_ID = c.fetchone()[0]
-                except pg.ProgrammingError:
-                    # no such table... schema has not been created
-                    pass
-
-    def createSchema(self):
-        with self.conn:
-            with self.conn.cursor() as c:
-                c.execute(_CREATE_TABLES_SQL)
+                c.execute("SELECT id FROM result_strings " +
+                          "WHERE str='OK'")
+                self.OK_ID = c.fetchone()[0]
 
     def doesCaseExist(self, sha):
         with self.conn:
@@ -166,30 +46,10 @@ class TriageDb(object):
         with self.conn:
             with self.conn.cursor() as c:
                 for sha, contents in cases:
-                    self._addCaseNames(c, [sha])
-                    self._addCaseContents(c, [(sha, contents)])
-
-    def _addCaseNames(self, cursor, casenames):
-        cursor.executemany('INSERT INTO cases (sha1) '
-                           'SELECT %s WHERE NOT EXISTS (' +
-                           '    SELECT 1 FROM cases WHERE sha1=%s)',
-                           ((x, x) for x in casenames))
-
-    def _addCaseContents(self, cursor, cases):
-        cursor.executemany(
-            'INSERT INTO case_contents (case_id, z_contents) ' +
-            '    (SELECT id, %s ' +
-            '     FROM cases ' +
-            '     WHERE sha1=%s AND NOT EXISTS (' +
-            '         SELECT 1 FROM case_contents WHERE case_id=id))',
-            ((zlib.compress(x[1]), x[0]) for x in cases))
-        cursor.executemany(
-            'INSERT INTO case_sizes (case_id, size) ' +
-            '    (SELECT id, %s ' +
-            '     FROM cases WHERE sha1=%s AND NOT EXISTS (' +
-            '         SELECT 1 FROM case_sizes ' +
-            '         WHERE case_sizes.case_id=id))',
-            ((len(x[1]), x[0]) for x in cases))
+                    c.executemany(
+                        'INSERT INTO case_view (sha1, z_contents, size) ' +
+                        'VALUES (?, ?, ?)',
+                        (sha, zlib.compress(contents), len(contents)))
 
     def populateCases(self, cases_path):
         case_files = os.listdir(cases_path)
@@ -368,8 +228,7 @@ def test(db):
 
 def main():
     db = TriageDb()
-    db.createSchema()
-    #db.populateCases(POPULATE_FROM)
+    db.populateCases(POPULATE_FROM)
 
     test(db)
 
