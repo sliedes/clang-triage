@@ -2,7 +2,7 @@ import subprocess as subp
 import os
 import time
 
-from config import MISC_REPORT_SAVE_DIR, TIMEOUT_CMD, CLANG_BINARY
+from config import MISC_REPORT_SAVE_DIR, CLANG_BINARY
 from config import CLANG_PARAMS, CLANG_TIMEOUT_CMD
 
 
