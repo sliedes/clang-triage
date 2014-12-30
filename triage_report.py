@@ -83,6 +83,12 @@ def get_num_distinct_reduced(db):
                   "FROM creduced_contents")
         return c.fetchone()[0]
 
+def get_num_runs_completed(db):
+    with db.cursor() as c:
+        c.execute("SELECT COUNT(*) " +
+                  "FROM test_runs")
+        return c.fetchone()[0]
+
 
 #def get_num_reduce_failed(db):
 #    with db.cursor() as c:
@@ -240,11 +246,10 @@ def main():
             num_inputs = c.fetchone()[0]
 
     assert test_runs, 'No test runs found.'
-    num_runs_completed = len(test_runs)
     last_run_completed = test_runs[0]['endTime']
 
     context = {'testRuns': test_runs,
-               'numRunsCompleted': num_runs_completed,
+               'numRunsCompleted': get_num_runs_completed(db),
                'numInputs': num_inputs,
                'lastRunCompleted': last_run_completed,
                'reduceQueueSize': get_reduce_queue_size(db),
