@@ -228,8 +228,7 @@ def test(db):
 
 def main():
     db = TriageDb()
-    #db.createSchema()
-    #db.populateCases(POPULATE_FROM)
+    db.populateCases(POPULATE_FROM)
 
     test(db)
 

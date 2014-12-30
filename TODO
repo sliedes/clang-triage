@@ -15,8 +15,6 @@ Triage engine
 * More controlled report generation instead of the current
   update-hook.sh
 
-* Handle update/build failures
-
 Database
 ========
 
@@ -34,9 +32,6 @@ Reducer
 
 Report
 ======
-
-* Do not show all runs from the beginning of time, but do something
-  more clever
 
 * Show failed reduces?
 
