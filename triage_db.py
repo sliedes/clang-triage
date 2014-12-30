@@ -93,14 +93,10 @@ CREATE VIEW results_view AS
     WHERE results.case_id = cases.id
         AND results.result = res.id;
 
-CREATE VIEW results_with_reduced_plus_output_view AS
-    SELECT test_run, id, sha1, str, cr.contents, output AS reduced
-    FROM results_view LEFT OUTER JOIN (
-        SELECT DISTINCT ON (original) original, con.contents
-        FROM creduced_cases AS cas, creduced_contents AS con
-        WHERE con.creduced_id = cas.id) AS cr
-    ON (cr.original = id), case_contents, outputs
-    WHERE id = case_contents.case_id AND id = outputs.case_id;
+CREATE TABLE outputs (
+   case_id BIGINT UNIQUE REFERENCES cases(id)
+       ON UPDATE CASCADE ON DELETE CASCADE,
+   output BYTEA NOT NULL);
 
 CREATE VIEW sha_reduced_view AS
     SELECT sha1, contents
@@ -130,11 +126,6 @@ CREATE VIEW changed_results AS
         last.result AS new, second.result AS old
     FROM last_run_results AS last, second_last_run_results AS second
     WHERE last.case_id=second.case_id AND last.result<>second.result;
-
-CREATE TABLE outputs (
-   case_id BIGINT UNIQUE REFERENCES cases(id)
-       ON UPDATE CASCADE ON DELETE CASCADE,
-   output BYTEA NOT NULL);
 '''.strip()
 
 
@@ -148,9 +139,13 @@ class TriageDb(object):
         self.conn = pg.connect('dbname=' + DB_NAME)
         with self.conn:
             with self.conn.cursor() as c:
-                c.execute("SELECT id FROM result_strings " +
-                          "WHERE str='OK'")
-                self.OK_ID = c.fetchone()[0]
+                try:
+                    c.execute("SELECT id FROM result_strings " +
+                              "WHERE str='OK'")
+                    self.OK_ID = c.fetchone()[0]
+                except pg.ProgrammingError:
+                    # no such table... schema has not been created
+                    pass
 
     def createSchema(self):
         with self.conn:
@@ -373,7 +368,7 @@ def test(db):
 
 def main():
     db = TriageDb()
-    #db.createSchema()
+    db.createSchema()
     #db.populateCases(POPULATE_FROM)
 
     test(db)
