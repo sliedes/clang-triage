@@ -32,6 +32,10 @@ Reducer
   reducer is run for cases where the result in DB is 'creduce_failed'
   or something.
 
+* Investigate why SIGTERMing (ctrl-c) creduce occasionally results in
+  a failure to remove the creduce tmpdir, indirectly resulting in
+  failure to remove the clang_triage tmpdir
+
 Report
 ======
 
