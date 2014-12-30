@@ -3,10 +3,9 @@
 import run_clang as rc
 import sys
 import os
-import typing
 
 
-def read_or_die(fname: str) -> bytes:
+def read_or_die(fname):
     try:
         with open(fname, 'rb') as f:
             return f.read()
@@ -26,6 +25,7 @@ def main():
         sys.exit(0)
     else:
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

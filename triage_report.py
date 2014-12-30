@@ -91,13 +91,6 @@ def get_num_runs_completed(db):
         return c.fetchone()[0]
 
 
-#def get_num_reduce_failed(db):
-#    with db.cursor() as c:
-#        c.execute("SELECT COUNT(DISTINCT original) " +
-#                  "FROM creduced_cases WHERE result='failed'")
-#        return c.fetchone()[0]
-
-
 def case_dict(sha):
     reduced = REDUCED_SHA_DICT.get(sha)
     output = OUTPUT_SHA_DICT.get(sha)
@@ -114,7 +107,6 @@ def case_dict(sha):
     return d
 
 
-# FIXME reduced cases
 def build_failure_context(reason, old_reason, cases):
     ds = [case_dict(case) for case in cases]
     ds[-1]['isLast'] = True
