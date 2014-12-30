@@ -64,7 +64,16 @@ def get_reduce_queue_size(db):
 def get_num_reduced(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
-                  "FROM creduced_cases WHERE result='ok'")
+                  "FROM creduced_cases " +
+                  "WHERE result='ok' OR result='dumb'")
+        return c.fetchone()[0]
+
+
+def get_num_dumb_reduced(db):
+    with db.cursor() as c:
+        c.execute("SELECT COUNT(DISTINCT original) " +
+                  "FROM creduced_cases " +
+                  "WHERE result='dumb'")
         return c.fetchone()[0]
 
 
@@ -75,11 +84,11 @@ def get_num_distinct_reduced(db):
         return c.fetchone()[0]
 
 
-def get_num_reduce_failed(db):
-    with db.cursor() as c:
-        c.execute("SELECT COUNT(DISTINCT original) " +
-                  "FROM creduced_cases WHERE result='failed'")
-        return c.fetchone()[0]
+#def get_num_reduce_failed(db):
+#    with db.cursor() as c:
+#        c.execute("SELECT COUNT(DISTINCT original) " +
+#                  "FROM creduced_cases WHERE result='failed'")
+#        return c.fetchone()[0]
 
 
 def case_dict(sha):
@@ -213,8 +222,8 @@ def main():
         with db.cursor() as c:
             c.execute('SELECT id, start_time, end_time, clang_version, ' +
                       '    llvm_version ' +
-                      'FROM test_runs ORDER BY start_time')
-            res = c.fetchall()
+                      'FROM test_runs ORDER BY start_time DESC LIMIT 60')
+            res = c.fetchall()[::-1]
         test_runs = []
 
         prev_run = None
@@ -241,7 +250,7 @@ def main():
                'reduceQueueSize': get_reduce_queue_size(db),
                'numReduced': get_num_reduced(db),
                'numDistinctReduced': get_num_distinct_reduced(db),
-               'numReduceFailed': get_num_reduce_failed(db),
+               'numDumbReduced': get_num_dumb_reduced(db),
                'date': asctime()}
 
     # group failures by reason

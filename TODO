@@ -17,6 +17,21 @@ Triage engine
 
 * Handle update/build failures
 
+Database
+========
+
+* The 'failed' value for creduce_result is probably not needed anymore
+  (unless renamed to 'creduce_failed', grep below for the idea)
+
+Reducer
+=======
+
+* Maybe parallelize the dumb reductions?
+
+* Perhaps split dumb reduce worker from creduce worker? S.t. the dumb
+  reducer is run for cases where the result in DB is 'creduce_failed'
+  or something.
+
 Report
 ======
 
@@ -29,6 +44,8 @@ Report
   the other part reads the JSON and generates the report
 
 * Figure out a better templating engine (for xhtml) than pystache
+
+* Might make sense to sort creduced cases earlier in report?
 
 Tools
 =====
@@ -48,5 +65,3 @@ Misc
 * Some kind of test framework
 
 * Rename export_blobs to export_cases
-
-* Maybe parallelize the dumb reductions?

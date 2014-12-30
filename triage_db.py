@@ -11,9 +11,11 @@ from config import DB_NAME, POPULATE_FROM
 
 
 class CReduceResult(Enum):
+    # these need not correspond with postgres's internal enum values
     ok = 1
     failed = 2
     no_crash = 3
+    dumb = 4
 
 _CREATE_TABLES_SQL = '''
 CREATE TABLE cases (
@@ -24,7 +26,7 @@ CREATE TABLE case_contents (
     case_id BIGINT PRIMARY KEY REFERENCES cases(id) ON UPDATE CASCADE,
     z_contents BYTEA NOT NULL);
 
-CREATE TYPE creduce_result AS ENUM ('ok', 'failed', 'no_crash');
+CREATE TYPE creduce_result AS ENUM ('ok', 'dumb', 'no_crash');
 
 CREATE TABLE creduced_cases (
     id BIGSERIAL PRIMARY KEY,
@@ -317,8 +319,8 @@ class TriageDb(object):
         return (r[0], zlib.decompress(r[1]))
 
     def addCReduced(self, versions, sha, result, contents=None):
-        if result == CReduceResult.ok:
-            assert contents, 'Result OK but no contents?'
+        if result == CReduceResult.ok or result == CReduceResult.dumb:
+            assert contents, 'Result OK or dumb but no contents?'
         else:
             assert (result == CReduceResult.failed or
                     result == CReduceResult.no_crash), result

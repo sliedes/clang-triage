@@ -25,12 +25,12 @@
       <tr><td>Last run completed</td><td>{{lastRunCompleted}}</td></tr>
       <tr><td>Test runs completed</td><td>{{numRunsCompleted}}</td></tr>
       <tr><td>Number of inputs in corpus</td><td>{{numInputs}}</td></tr>
-      <tr><td>Number of cases in CReduce queue</td><td>{{reduceQueueSize}}</td></tr>
-      <tr><td>Number of CReduced cases</td><td>{{numReduced}}
+      <tr><td>Number of cases in reduce queue</td><td>{{reduceQueueSize}}</td></tr>
+      <tr><td>Number of reduced cases</td><td>{{numReduced}}
       ({{numDistinctReduced}} distinct after reduction)</td></tr>
-      <tr><td>Number of cases where CReduce failed</td><td>{{numReduceFailed}}</td></tr>
+      <tr><td>Number of cases reduced by dumb reducer</td><td>{{numDumbReduced}}</td></tr>
     </table>
-    <h2><a id="changes">Changes between test runs</a></h2>
+    <h2><a id="changes">Changes between last 60 test runs</a></h2>
     {{#testRuns}}
     {{#anyChanged?}}
     <h3>Run #{{id}} on {{date}}, {{numDistinctFailures}} distinct crashes</h3>

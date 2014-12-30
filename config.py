@@ -28,7 +28,7 @@ CLANG_BINARY = BUILD + '/bin/clang'
 MIN_GIT_CHECKOUT_INTERVAL = 10*60
 
 # Give creduce this long to complete before killing it
-CREDUCE_TIMEOUT = 4*60
+CREDUCE_TIMEOUT = 2*60 + 30
 
 # Name of postgresql database to connect to
 DB_NAME = 'clang_triage'

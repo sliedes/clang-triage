@@ -34,7 +34,7 @@ def reduce_worker_one_iter(db, versions):
         reduced = dumb_reduce(contents)
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
               file=sys.stderr)
-        db.addCReduced(versions, sha, CReduceResult.ok, reduced)
+        db.addCReduced(versions, sha, CReduceResult.dumb, reduced)
     return True
 
 
