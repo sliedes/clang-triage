@@ -37,6 +37,13 @@ Reducer
   a failure to remove the creduce tmpdir, indirectly resulting in
   failure to remove the clang_triage tmpdir
 
+* Do not outright remove outdated reduced cases; mark and show them in
+  report as possibly outdated.
+
+* Detect new creduce version when deciding to remove/outdate reduced
+  cases.
+
+
 Report
 ======
 
