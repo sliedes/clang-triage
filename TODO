@@ -15,6 +15,16 @@ Triage engine
 * More controlled report generation instead of the current
   update-hook.sh
 
+* Check that llvm-symbolizer is on path, since that makes the outputs
+  much more readable
+
+  * Also, having llvm-symbolizer makes doing triage runs in parallel
+    much more critical, as they now take time.
+
+* On clang executions, somehow detect a totally botched execution
+  (like the binary missing). Now it seems to be recorded as a success.
+
+
 Database
 ========
 
