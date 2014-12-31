@@ -24,6 +24,8 @@ Triage engine
 * On clang executions, somehow detect a totally botched execution
   (like the binary missing). Now it seems to be recorded as a success.
 
+* Run report generation when idle sleep starts; new stuff may have
+  been reduced and be waiting to get out.
 
 Database
 ========
