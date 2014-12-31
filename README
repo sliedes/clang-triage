@@ -43,7 +43,7 @@ Setup
            -DLLVM_ENABLE_ASSERTIONS=ON -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
 	   -DCLANG_ENABLE_ARCMT=OFF -GNinja
 
-* Run ninja in the BUILD dir for an initial build
+* Run ninja in the BUILD dir for an initial build.
 
 * Create a database with the name in DB_NAME and grant yourself the
   rights to it.

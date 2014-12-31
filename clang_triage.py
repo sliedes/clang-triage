@@ -48,11 +48,11 @@ def update_and_check_if_should_run(db):
 
     lastRun = db.getLastRunTimeByVersions(versions)
     if lastRun:
-        print('A test run with these versions was started at {} ' +
-              'and completed at {}. Skipping test.'.format(
-                  time.asctime(time.localtime(lastRun[0])),
-                  time.asctime(time.localtime(lastRun[1]))),
-              file=sys.stderr)
+        print(('A test run with these versions was started at {start} ' +
+               'and completed at {end}. Skipping test.').format(
+            start=time.asctime(time.localtime(lastRun[0])),
+            end=time.asctime(time.localtime(lastRun[1]))),
+            file=sys.stderr)
         return False
     else:
         print('Version previously unseen. Running test...', file=sys.stderr)
