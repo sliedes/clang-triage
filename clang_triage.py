@@ -4,6 +4,8 @@ import sys
 import subprocess as subp
 import time
 
+import multiprocessing.dummy as mp
+
 from triage_db import TriageDb, CReduceResult
 from repository import update_and_build, get_versions, build
 from run_clang import test_input, test_input_reduce
@@ -83,24 +85,22 @@ def test_iter(start_from_current=False):
     with db.testRun(versions) as run:
         i = 1
         numBad = 0
-        for sha, data in db.iterateCases():
-            reason, output = test_input(data, TRIAGE_EXTRA_CLANG_PARAMS)
-            if not reason:
-                reason = 'OK'
-                output = None
-            else:
-                numBad += 1
-            #print('{}/{} ({}): {}'.format(i, numCases, sha, reason))
-            print('\r{curr}/{max}  {nbad} bad ({prop:.1%})'.format(
-                curr=i, max=numCases, nbad=numBad,
-                prop=numBad/i), end='', file=sys.stderr)
-            i += 1
+        with mp.Pool() as pool:
+            test_func = lambda sha_data: (sha_data[0], test_input(
+                sha_data[1], TRIAGE_EXTRA_CLANG_PARAMS))
+            for sha, (reason, output) in pool.imap_unordered(
+                    test_func, db.iterateCases()):
+                if not reason:
+                    reason = 'OK'
+                    output = None
+                else:
+                    numBad += 1
+                print('\r{curr}/{max}  {nbad} bad ({prop:.1%})'.format(
+                    curr=i, max=numCases, nbad=numBad,
+                    prop=numBad/i), end='', file=sys.stderr)
+                i += 1
 
-            run.addResult(sha, reason, output)
-            #reason = test_input(data, ['-O3'] + TRIAGE_EXTRA_CLANG_PARAMS)
-            #if reason:
-            #    s = '{sha}\t-O3 only: {reason}'
-            #    print(s.format(sha=sha, reason=reason))
+                run.addResult(sha, reason, output)
         print(file=sys.stderr)
 
 

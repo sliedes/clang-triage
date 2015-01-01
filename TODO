@@ -7,8 +7,6 @@ Triage engine
   affect them (the versions used are stored in the database, but
   nothing is done with them). Figure out the right way of using it.
 
-* Do the triage runs in parallel
-
 * Write code to tell apart creduce failure from failure in our
   property check script?
 
@@ -17,9 +15,6 @@ Triage engine
 
 * Check that llvm-symbolizer is on path, since that makes the outputs
   much more readable
-
-  * Also, having llvm-symbolizer makes doing triage runs in parallel
-    much more critical, as they now take time.
 
 * On clang executions, somehow detect a totally botched execution
   (like the binary missing). Now it seems to be recorded as a success.
