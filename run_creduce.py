@@ -6,7 +6,7 @@ import sys
 import string
 import subprocess as subp
 
-from run_clang import test_input
+from run_clang import test_input, test_input_reduce
 from utils import env_with_tmpdir
 from config import CREDUCE_PROPERTY_SCRIPT, CREDUCE_TIMEOUT
 
@@ -44,7 +44,7 @@ def run_creduce(data, reason):
             return None
         with open(cpp_fname, 'rb') as f:
             reduced = f.read()
-    reduced_reason, output = test_input(reduced)
+    reduced_reason, output = test_input_reduce(reduced)
     if reason != reduced_reason:
         print('CReduced case produces different result: {} != {}'.format(
             reduced_reason, reason), file=sys.stderr)
@@ -64,7 +64,7 @@ def try_remove_nonprintables(contents, reason):
             else:
                 tail = b''
             for replacement in [b'', b' ', b'_']:
-                r, out = test_input(reduced + replacement + tail)
+                r, out = test_input_reduce(reduced + replacement + tail)
                 if r == reason:
                     reduced += replacement
                     break
@@ -73,7 +73,8 @@ def try_remove_nonprintables(contents, reason):
                 reduced += contents[i:i+1]
         else:
             reduced += contents[i:i+1]
-    assert test_input(contents)[0] == test_input(reduced)[0]
+    assert (test_input_reduce(contents)[0] ==
+            test_input_reduce(reduced)[0])
     return reduced
 
 

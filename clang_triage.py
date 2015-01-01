@@ -6,7 +6,7 @@ import time
 
 from triage_db import TriageDb, CReduceResult
 from repository import update_and_build, get_versions, build
-from run_clang import test_input
+from run_clang import test_input, test_input_reduce
 from run_creduce import reduce_one
 from dumb_reduce import dumb_reduce
 
@@ -18,7 +18,8 @@ def reduce_worker_one_iter(db, versions):
     sha, contents = work
     print('Running creduce for ' + sha + '... ', file=sys.stderr, end='')
     sys.stderr.flush()
-    reason = test_input(contents)[0]
+    reason = test_input_reduce(contents)[0]
+    assert test_input(contents, [])[0] == reason
     if not reason:
         print('Input does not crash.', file=sys.stderr)
         db.addCReduced(versions, sha, CReduceResult.no_crash)
@@ -82,7 +83,7 @@ def test_iter(start_from_current=False):
         i = 1
         numBad = 0
         for sha, data in db.iterateCases():
-            reason, output = test_input(data)
+            reason, output = test_input(data, TRIAGE_EXTRA_CLANG_PARAMS)
             if not reason:
                 reason = 'OK'
                 output = None
@@ -95,7 +96,7 @@ def test_iter(start_from_current=False):
             i += 1
 
             run.addResult(sha, reason, output)
-            #reason = test_input(data, ['-O3'])
+            #reason = test_input(data, ['-O3'] + TRIAGE_EXTRA_CLANG_PARAMS)
             #if reason:
             #    s = '{sha}\t-O3 only: {reason}'
             #    print(s.format(sha=sha, reason=reason))

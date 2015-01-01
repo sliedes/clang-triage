@@ -4,6 +4,7 @@ import time
 
 from config import MISC_REPORT_SAVE_DIR, CLANG_BINARY
 from config import CLANG_PARAMS, CLANG_TIMEOUT_CMD
+from config import REDUCTION_EXTRA_CLANG_PARAMS
 
 
 def save_data(prefix, data):
@@ -49,3 +50,7 @@ def test_input(data, extra_params=[]):
     stdout = p.communicate(data)[0]
     retval = p.returncode
     return check_for_clang_crash(stdout, retval), stdout
+
+
+def test_input_reduce(data):
+    return test_input(data, REDUCTION_EXTRA_CLANG_PARAMS)

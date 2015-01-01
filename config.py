@@ -18,9 +18,13 @@ CLANG_TIMEOUT = 4
 # timeout from GNU coreutils
 CLANG_TIMEOUT_CMD = ['timeout', '-k', str(CLANG_TIMEOUT), str(CLANG_TIMEOUT)]
 
+# common for both triage and reduction
 CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-fno-crash-diagnostics', '-xc++', '-c',
                 '-o' '/dev/null', '-']
+
+REDUCTION_EXTRA_CLANG_PARAMS = []
+TRIAGE_EXTRA_CLANG_PARAMS = []
 
 # A map from human-readable names to directories where to run git pull
 PROJECTS = {'llvm': LLVM_SRC, 'clang': LLVM_SRC + '/tools/clang'}

@@ -20,7 +20,7 @@ def main():
         fname = os.path.join(os.environ['CLANG_TRIAGE_TMP'], fname)
     reason = read_or_die(fname).decode('utf-8')
     data = read_or_die('buggy.cpp')
-    result = rc.test_input(data)[0]
+    result = rc.test_input_reduce(data)[0]
     if result.strip() == reason.strip():
         sys.exit(0)
     else:
