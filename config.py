@@ -47,3 +47,7 @@ DB_NAME = 'clang_triage'
 MISC_REPORT_SAVE_DIR = 'saved'
 
 CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'
+
+# This path is used to disable llvm-symbolizer. It should contain a
+# symlink named llvm-symbolizer pointing to /bin/false.
+DUMMY_LLVM_SYMBOLIZER_PATH = 'dummy-llvm-symbolizer'

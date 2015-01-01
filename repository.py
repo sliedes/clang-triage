@@ -93,7 +93,7 @@ def get_versions():
 def build():
     try:
         subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
-    except subp.CalledProcessError as e:
+    except subp.CalledProcessError:
         print('Ninja build failed.', file=sys.stderr)
         return False
     return True

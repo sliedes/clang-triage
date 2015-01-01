@@ -1,10 +1,13 @@
 import subprocess as subp
 import os
 import time
+import sys
+import copy
 
 from config import MISC_REPORT_SAVE_DIR, CLANG_BINARY
 from config import CLANG_PARAMS, CLANG_TIMEOUT_CMD
 from config import REDUCTION_EXTRA_CLANG_PARAMS
+from config import DUMMY_LLVM_SYMBOLIZER_PATH
 
 
 def save_data(prefix, data):
@@ -43,14 +46,19 @@ def check_for_clang_crash(output, retval):
     return None
 
 
-def test_input(data, extra_params=[]):
+def test_input(data, extra_params=[], extra_path=[]):
     CMD = CLANG_TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
+    env = copy.copy(os.environ)
+    path = os.pathsep.join(extra_path + env['PATH'].split(os.pathsep))
+    env['PATH'] = path
     p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
-                   stderr=subp.STDOUT, cwd='/')
+                   stderr=subp.STDOUT, cwd='/', env=env)
     stdout = p.communicate(data)[0]
     retval = p.returncode
     return check_for_clang_crash(stdout, retval), stdout
 
 
 def test_input_reduce(data):
-    return test_input(data, REDUCTION_EXTRA_CLANG_PARAMS)
+    return test_input(
+        data, extra_params=REDUCTION_EXTRA_CLANG_PARAMS,
+        extra_path=[os.path.abspath(DUMMY_LLVM_SYMBOLIZER_PATH)])
