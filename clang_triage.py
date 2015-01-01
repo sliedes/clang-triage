@@ -9,6 +9,7 @@ from repository import update_and_build, get_versions, build
 from run_clang import test_input, test_input_reduce
 from run_creduce import reduce_one
 from dumb_reduce import dumb_reduce
+from config import TRIAGE_EXTRA_CLANG_PARAMS
 
 
 def reduce_worker_one_iter(db, versions):
