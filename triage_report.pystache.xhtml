@@ -15,8 +15,8 @@
     <h2>Contents</h2>
     <ol>
       <li><a href="#stats">Statistics</a></li>
-      <li><a href="#changes">Changes between test runs</a></li>
       <li><a href="#latest">Test case summary for latest test run</a></li>
+      <li><a href="#changes">Changes between test runs</a></li>
       <li><a href="#download">Download test cases</a></li>
     </ol>
     <h2><a id="stats">Statistics</a></h2>
@@ -30,6 +30,25 @@
       ({{numDistinctReduced}} distinct after reduction)</td></tr>
       <tr><td>Number of cases reduced by dumb reducer</td><td>{{numDumbReduced}}</td></tr>
     </table>
+    <h2><a id="latest">Test case summary for latest test run</a></h2>
+
+    {{#numDistinctFailures}}
+    <p>Triggered <i>{{numDistinctFailures}}</i> distinct failures.</p>
+    {{/numDistinctFailures}}
+
+    {{#failures}}
+    <p><b>{{reason}}</b></p>
+    <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
+    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{#haveReduced}}
+      <a href="{{reducedUrl}}">
+	<small>(reduced)</small></a>{{/haveReduced}}{{#haveOutput}}
+      <a href="{{outputUrl}}"><small>(output)</small></a>{{/haveOutput}}{{^isLast}}, {{/isLast}}
+      {{/cases}}
+    {{#ellipsis}}...{{/ellipsis}}</p> <hr/> {{/failures}}
+    {{^failures}}
+    <p>No failed test cases.</p>
+    {{/failures}}
+
     <h2><a id="changes">Changes between last 60 test runs</a></h2>
     {{#testRuns}}
     {{#anyChanged?}}
@@ -57,24 +76,6 @@
     <span class="ver">{{prevVersion}}</span>.<br/>
     {{/anyChanged?}}
     {{/testRuns}}
-    <h2><a id="latest">Test case summary for latest test run</a></h2>
-
-    {{#numDistinctFailures}}
-    <p>Triggered <i>{{numDistinctFailures}}</i> distinct failures.</p>
-    {{/numDistinctFailures}}
-
-    {{#failures}}
-    <p><b>{{reason}}</b></p>
-    <p><i>{{numCases}}</i> case{{#plural}}s{{/plural}}:</p>
-    <p>{{#cases}} <a class="mo" href="{{url}}">{{shortCase}}</a>{{#haveReduced}}
-      <a href="{{reducedUrl}}">
-	<small>(reduced)</small></a>{{/haveReduced}}{{#haveOutput}}
-      <a href="{{outputUrl}}"><small>(output)</small></a>{{/haveOutput}}{{^isLast}}, {{/isLast}}
-      {{/cases}}
-    {{#ellipsis}}...{{/ellipsis}}</p> <hr/> {{/failures}}
-    {{^failures}}
-    <p>No failed test cases.</p>
-    {{/failures}}
 
     <h2><a id="download">Download test cases</a></h2>
     <p>You can also download a <a href="all_cases.tar.bz2">tarball of
