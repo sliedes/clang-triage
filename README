@@ -24,6 +24,7 @@ Prerequisites
 * git
 * ninja (the build system)
 * creduce
+  * also, creduce's dependencies
 * python3-pystache (0.5.4 tested)
 * timeout from GNU coreutils
 

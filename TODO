@@ -22,11 +22,16 @@ Triage engine
 * Run report generation when idle sleep starts; new stuff may have
   been reduced and be waiting to get out.
 
+* Locking: Detect that clang_triage is already running for some of the
+  resources.
+
+
 Database
 ========
 
 * The 'failed' value for creduce_result is probably not needed anymore
   (unless renamed to 'creduce_failed', grep below for the idea)
+
 
 Reducer
 =======
@@ -61,7 +66,9 @@ Report
 
 * Figure out a better templating engine (for xhtml) than pystache
 
-* Might make sense to sort creduced cases earlier in report?
+* Might make sense to sort creduced cases earlier in report than
+  dumb-reduced ones?
+
 
 Tools
 =====
@@ -71,6 +78,12 @@ Tools
 
 * Also make import tool take input directory as param. Probably no
   need to have it in config.py since it's mosty a one-off operation.
+
+* Add an option to import only a percentage (or upper limit) of test
+  cases, for quick testing.
+
+* Write a setup script to replace the steps described in README.
+
 
 Misc
 ====
