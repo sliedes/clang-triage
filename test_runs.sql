@@ -19,9 +19,12 @@ CREATE TABLE results (
     case_id BIGINT NOT NULL,
     test_run BIGINT NOT NULL,
     result BIGINT NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES case_contents(case_id) ON UPDATE CASCADE,
-    FOREIGN KEY(test_run) REFERENCES test_runs(id) ON UPDATE CASCADE,
-    FOREIGN KEY(result) REFERENCES result_strings(id) ON UPDATE CASCADE);
+    FOREIGN KEY(case_id) REFERENCES case_contents(case_id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY(test_run) REFERENCES test_runs(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY(result) REFERENCES result_strings(id)
+        ON UPDATE CASCADE ON DELETE CASCADE);
 CREATE INDEX results_case_id ON results(case_id);
 CREATE INDEX results_test_run ON results(test_run);
 CREATE INDEX results_result ON results(result);

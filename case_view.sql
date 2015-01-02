@@ -15,7 +15,8 @@ ALTER TABLE cases ADD CONSTRAINT cases_id_forward_fkey
 CREATE TABLE case_sizes (
     case_id BIGINT PRIMARY KEY,
     size INTEGER NOT NULL,
-    FOREIGN KEY(case_id) REFERENCES cases(id) ON UPDATE CASCADE);
+    FOREIGN KEY(case_id) REFERENCES cases(id)
+        ON UPDATE CASCADE ON DELETE CASCADE);
 CREATE INDEX case_sizes_size ON case_sizes(size);
 
 -- 1:1 between case_sizes and case_contents (and thus cases)
@@ -50,16 +51,15 @@ CREATE TRIGGER case_view_insert_trigger
     FOR EACH ROW EXECUTE PROCEDURE case_view_insert_trigger_func();
 
 CREATE FUNCTION case_view_delete_trigger_func() RETURNS trigger AS $$
-DECLARE
-  id BIGINT;
 BEGIN
-    SET CONSTRAINTS cases_id_forward_fkey,
-        case_contents_case_id_forward_fkey DEFERRED;
+---- We now have ON DELETE CASCADE on almost everything
+--    SET CONSTRAINTS cases_id_forward_fkey,
+--        case_contents_case_id_forward_fkey DEFERRED;
     DELETE FROM case_sizes WHERE case_id=OLD.id;
-    DELETE FROM case_contents WHERE case_id=OLD.id;
-    DELETE FROM cases WHERE cases.id=OLD.id;
-    SET CONSTRAINTS cases_id_forward_fkey,
-        case_contents_case_id_forward_fkey IMMEDIATE;
+--    DELETE FROM case_contents WHERE case_id=OLD.id;
+--    DELETE FROM cases WHERE cases.id=OLD.id;
+--    SET CONSTRAINTS cases_id_forward_fkey,
+--        case_contents_case_id_forward_fkey IMMEDIATE;
     RETURN OLD;
 END; $$ LANGUAGE PLPGSQL;
 

@@ -2,7 +2,8 @@ CREATE TYPE creduce_result AS ENUM ('ok', 'dumb', 'no_crash');
 
 CREATE TABLE creduced_cases (
     id BIGSERIAL PRIMARY KEY,
-    original BIGINT UNIQUE NOT NULL REFERENCES cases(id) ON UPDATE CASCADE,
+    original BIGINT UNIQUE NOT NULL REFERENCES cases(id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
     clang_version INTEGER NOT NULL,
     llvm_version INTEGER NOT NULL,
     result creduce_result NOT NULL);
