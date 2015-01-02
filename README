@@ -62,14 +62,13 @@ Sorry, this is still a bit involved...
       CREATE USER joeuser IN ROLE clang_triage;
       CREATE DATABASE clang_triage OWNER clang_triage;
 
-* Create the schema (database tables) by running (as joeuser) the command
+* Populate the database with the cases by running
 
-      psql clang_triage -f create_schema.sql
+    ./import_cases.py /path/to/cases
 
-    * This should not output any errors
-
-* Populate the database with the cases by putting them in
-  POPULATE_FROM (all in the same directory) and running triage_db.py.
+  where /path/to/cases contains your test cases. All files under the
+  directory will be imported, recursively; the filenames do not
+  matter.
 
 * For report generation, clang_triage periodically runs
   update-hook.sh. Edit that script (at least) to change the paths to

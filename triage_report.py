@@ -155,11 +155,11 @@ def group_changed_failures(changed_fails, reduced_sizes):
     'changed_fails: [(sha1, reason, prev_reason)]'
 
     groups = {}
-    for sha1, reason, prev_reason in changed_fails:
+    for sha, reason, prev_reason in changed_fails:
         rt = (reason, prev_reason)
         if not rt in groups:
             groups[rt] = []
-        groups[rt].append(sha1)
+        groups[rt].append(sha)
 
     for x in groups:
         groups[x] = sort_cases(groups[x], reduced_sizes)

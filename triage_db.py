@@ -4,11 +4,13 @@ import psycopg2 as pg
 import os
 import time
 import zlib
-import sys
 import hashlib
+import itertools
+import subprocess as subp
 from enum import Enum
+import sys
 
-from config import DB_NAME, POPULATE_FROM
+from config import DB_NAME, CREATE_SCHEMA_COMMAND
 
 
 class CReduceResult(Enum):
@@ -19,9 +21,19 @@ class CReduceResult(Enum):
     dumb = 4
 
 
+def allFilesRecursive(path):
+    for root, dirs, files in os.walk(path, followlinks=True):
+        for f in files:
+            yield os.path.join(root, f)
+
+
 def readFile(path):
     with open(path, 'rb') as f:
         return f.read()
+
+
+class DbNotInitialized(Exception):
+    pass
 
 
 class TriageDb(object):
@@ -29,9 +41,22 @@ class TriageDb(object):
         self.conn = pg.connect(database=DB_NAME)
         with self.conn:
             with self.conn.cursor() as c:
-                c.execute("SELECT id FROM result_strings " +
-                          "WHERE str='OK'")
-                self.OK_ID = c.fetchone()[0]
+                try:
+                    c.execute("SELECT id FROM result_strings " +
+                              "WHERE str='OK'")
+                    self.OK_ID = c.fetchone()[0]
+                except pg.ProgrammingError:
+                    raise DbNotInitialized()
+
+    @staticmethod
+    def createSchema():
+        print('Creating database schema...', file=sys.stderr)
+        try:
+            subp.check_call(CREATE_SCHEMA_COMMAND, stderr=subp.STDOUT)
+        except subp.CalledProcessError as e:
+            print('Schema creation failed.', file=sys.stderr)
+            print('Output from psql:\n' + e.output, file=sys.stderr)
+            raise
 
     def doesCaseExist(self, sha):
         with self.conn:
@@ -52,8 +77,11 @@ class TriageDb(object):
                     ((x[0], zlib.compress(x[1]), len(x[1]))
                      for x in cases))
 
-    def populateCases(self, cases_path):
-        case_files = os.listdir(cases_path)
+    def populateCases(self, cases_path, stop_after=None):
+        case_files = allFilesRecursive(cases_path)
+
+        if stop_after:
+            case_files = itertools.islice(case_files, 0, stop_after)
 
         def cases_iter():
             for fname in case_files:
@@ -218,12 +246,3 @@ class TriageDb(object):
         def addResult(self, sha, result_string, output):
             'Output will be ignored if result_string="OK".'
             self.results.append((sha, result_string, output))
-
-
-def main():
-    db = TriageDb()
-    db.populateCases(POPULATE_FROM)
-
-
-if __name__ == '__main__':
-    main()

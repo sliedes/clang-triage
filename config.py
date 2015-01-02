@@ -6,17 +6,13 @@ LLVM_SRC = TOP + '/llvm.src'
 # build directory
 BUILD = TOP + '/clang-triage.ninja'
 
-# Where triage_db.py should get test cases from
-POPULATE_FROM = '/home/sliedes/scratch/afl/cases.minimized'
-
-NINJA_PARAMS = ['-j8']
+# Parameters to give to ninja to build LLVM. For example, -j8 to run
+# on 8 cores (the default is derived from number of cores available).
+NINJA_PARAMS = []
 
 # seconds; will wait additional this many seconds for it to terminate
 # after SIGTERM and then kill it
 CLANG_TIMEOUT = 4
-
-# timeout from GNU coreutils
-CLANG_TIMEOUT_CMD = ['timeout', '-k', str(CLANG_TIMEOUT), str(CLANG_TIMEOUT)]
 
 # common for both triage and reduction
 CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
@@ -46,8 +42,20 @@ DB_NAME = 'clang_triage'
 # failure)
 MISC_REPORT_SAVE_DIR = 'saved'
 
+
+# --- Generally you should not need to change anything below this.
+
+
 CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'
 
 # This path is used to disable llvm-symbolizer. It should contain a
 # symlink named llvm-symbolizer pointing to /bin/false.
 DUMMY_LLVM_SYMBOLIZER_PATH = 'dummy-llvm-symbolizer'
+
+# Postgresql command to create schema.
+CREATE_SCHEMA_COMMAND = [
+    'psql', '-v', 'ON_ERROR_STOP=1', '--quiet', '-d', DB_NAME,
+    '-f', 'create_schema.sql']
+
+# timeout from GNU coreutils
+CLANG_TIMEOUT_CMD = ['timeout', '-k', str(CLANG_TIMEOUT), str(CLANG_TIMEOUT)]

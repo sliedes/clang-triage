@@ -1,7 +1,6 @@
 import subprocess as subp
 import os
 import time
-import sys
 import copy
 
 from config import MISC_REPORT_SAVE_DIR, CLANG_BINARY
@@ -51,11 +50,11 @@ def test_input(data, extra_params=[], extra_path=[]):
     env = copy.copy(os.environ)
     path = os.pathsep.join(extra_path + env['PATH'].split(os.pathsep))
     env['PATH'] = path
-    p = subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
-                   stderr=subp.STDOUT, cwd='/', env=env)
-    stdout = p.communicate(data)[0]
-    retval = p.returncode
-    return check_for_clang_crash(stdout, retval), stdout
+    with subp.Popen(CMD, stdin=subp.PIPE, stdout=subp.PIPE,
+                    stderr=subp.STDOUT, cwd='/', env=env) as p:
+        stdout = p.communicate(data)[0]
+        retval = p.returncode
+        return check_for_clang_crash(stdout, retval), stdout
 
 
 def test_input_reduce(data):
