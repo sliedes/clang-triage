@@ -22,7 +22,7 @@ Prerequisites
 * python3-psycopg2 (2.5.4 tested)
 * postgresql database (9.4 tested)
 * git
-* ninja (the build system)
+* cmake and ninja (the build system)
 * creduce
   * also, creduce's dependencies
 * python3-pystache (0.5.4 tested)
