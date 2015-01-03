@@ -14,6 +14,17 @@ clang-triage is a bot which does, broadly, the following:
   to reduce them using CReduce. On failure, use a builtin dumber
   (fast, but produces very terse results) reduction algorithm.
 
+The idea is to have a large number of malformed inputs which have
+previously caused crashes or otherwise exercise weird code paths in
+clang or LLVM. The test verdict only depends on whether clang crashed
+on the input or not; there is no functionality to do anything with the
+object file, if any, produced. A good way to produce large numbers of
+such cases is by running afl-fuzz.
+
+In principle there is no reason why this could not be easily modified
+to test other LLVM frontends besides clang, non-LLVM compilers or even
+non-compilers.
+
 
 Prerequisites
 =============
