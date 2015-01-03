@@ -27,6 +27,7 @@ Prerequisites
   * also, creduce's dependencies
 * python3-pystache (0.5.4 tested)
 * timeout from GNU coreutils
+* pbzip2, unless you change config.py to use plain bzip2
 
 
 Setup
