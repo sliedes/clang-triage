@@ -34,7 +34,7 @@ TRIAGE_EXTRA_CLANG_PARAMS = []
 # A map from human-readable names to directories where to run git pull
 PROJECTS = {'llvm': LLVM_SRC, 'clang': LLVM_SRC + '/tools/clang'}
 
-# Path to tested binary
+# Path to binary to test
 CLANG_BINARY = BUILD + '/bin/clang'
 
 # Do not do git pull more often than this (seconds)
