@@ -32,68 +32,41 @@ Prerequisites
 Setup
 =====
 
-Sorry, this is still a bit involved...
+1. edit config.py to match your setup
 
+2. git checkout llvm and tools/clang from the repository you wish to
+   follow to LLVM_SRC as specified in config
 
-* edit config.py to match your setup
+3. Configure LLVM for cmake/ninja build in BUILD
 
-* git checkout llvm and tools/clang to LLVM_SRC as specified in config
-
-* Configure LLMV for cmake/ninja build in BUILD
-
-  * Use something like
+  a) Use something like
 
        cmake ../llvm.src -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
            -DLLVM_ENABLE_ASSERTIONS=ON -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
 	   -DCLANG_ENABLE_ARCMT=OFF -GNinja
 
-  * You may also build it (no need to install) if you wish - otherwise
-    clang-triage will do that for you
+  b) You may also build it (no need to install) if you wish - otherwise
+     clang-triage will do that for you
 
-* Create a database with the name in DB_NAME and grant yourself the
-  rights to it.
+4. Create a database with the name in DB_NAME and grant yourself the
+   rights to it.
 
-  * For example: as postgres (the postgresql superuser), run psql and
-    issue the following SQL statements (assuming your username is
-    joeuser and your postgres is configured, as it is at least in
-    Debian, to match Unix usernames to postgres usernames):
+  a) For example: as postgres (the postgresql superuser), run psql and
+     issue the following SQL statements (assuming your username is
+     joeuser and your postgres is configured, as it is at least in
+     Debian, to match Unix usernames to postgres usernames):
 
-      CREATE ROLE clang_triage;
-      CREATE USER joeuser IN ROLE clang_triage;
-      CREATE DATABASE clang_triage OWNER clang_triage;
+       CREATE ROLE clang_triage;
+       CREATE USER joeuser IN ROLE clang_triage;
+       CREATE DATABASE clang_triage OWNER clang_triage;
 
-* Populate the database with the cases by running
+5. Populate the database with the cases by running
 
-    ./import_cases.py /path/to/cases
+     ./import_cases.py /path/to/cases
 
   where /path/to/cases contains your test cases. All files under the
   directory will be imported, recursively; the filenames do not
   matter.
 
-* For report generation, clang_triage periodically runs
-  update-hook.sh. Edit that script (at least) to change the paths to
-  where you want the report to live. Call that directory $REPORT_DIR
-  for the rest of this README. If you don't have pbzip2, change it to
-  regular bzip2 (or to some other compressor, but then you will have
-  to edit the paths in triage_report.pystache.xhtml too).
-
-* Create $REPORT_DIR unless it already exists.
-
-* Run extract_cases.py. It will generate a directory tree named "sha".
-  Move sha to $REPORT_DIR/sha. This directory contains the original
-  cases.
-
-* Let $SRC be the directory where your clang-triage source lives. Now
-  in $REPORT_DIR execute
-
-    ln -s $SRC/cr $SRC/out .
-
-  and make sure your web server is willing to follow the symlinks. Or
-  alternatively arrange update-hook.sh to somehow move those
-  directories to $REPORT_DIR.
-
-  * The cr directory contains the reduced cases. The out directory
-    contains the stdout/stderr of clang for failed cases.
-
-* Now you should be ready to run the bot: run clang_triage.py from the
-  clang-triage source directory.
+6. Now you should be ready to run the bot: run clang_triage.py from the
+   clang-triage source directory.

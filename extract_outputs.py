@@ -4,9 +4,13 @@ from triage_db import TriageDb
 from sha_file_tree import make_sha_tree
 
 
-def main():
+def extract_outputs(path):
     db = TriageDb()
-    make_sha_tree('out', db.iterateOutputs(), suffix='.txt', rm_old=True)
+    make_sha_tree(path, db.iterateOutputs(), suffix='.txt', rm_old=False)
+
+
+def main():
+    extract_outputs('out')
 
 
 if __name__ == '__main__':

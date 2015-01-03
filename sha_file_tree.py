@@ -25,6 +25,14 @@ def looks_like_sha_tree(path):
     return True
 
 
+def make_empty_sha_tree(path):
+    os.mkdir(path)
+    for x in DIGITS:
+        os.mkdir(os.path.join(path, x))
+        for y in DIGITS:
+            os.mkdir(os.path.join(path, x, y))
+
+
 def make_sha_tree(path, contentses, suffix='', rm_old=False):
     'Make a two-level sha tree rooted on path.'
 
@@ -33,11 +41,7 @@ def make_sha_tree(path, contentses, suffix='', rm_old=False):
         rmtree(path)
 
     if not os.path.isdir(path):
-        os.mkdir(path)
-        for x in DIGITS:
-            os.mkdir(os.path.join(path, x))
-            for y in DIGITS:
-                os.mkdir(os.path.join(path, x, y))
+        make_empty_sha_tree(path)
 
     for contents in contentses:
         sha = sha1(contents).hexdigest()

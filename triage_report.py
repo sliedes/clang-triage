@@ -5,11 +5,26 @@ import pystache
 import time
 from hashlib import sha1
 import zlib
+import os
+import subprocess as subp
 
-from config import DB_NAME
+from extract_cases import extract_cases
+from extract_creduced import extract_creduced
+from extract_outputs import extract_outputs
+
+from config import DB_NAME, REPORT_DIR, BZIP2_COMMAND, REPORT_FILENAME
 
 # show at most this many failing cases per reason
 MAX_SHOW_CASES = 20
+
+REPORT_DIR = os.path.abspath(REPORT_DIR)
+REPORT_FILENAME = os.path.join(REPORT_DIR, REPORT_FILENAME)
+SHA_DIR = os.path.join(REPORT_DIR, 'sha')
+CR_DIR = os.path.join(REPORT_DIR, 'cr')
+OUT_DIR = os.path.join(REPORT_DIR, 'out')
+CASES_BZ2 = os.path.join(REPORT_DIR, 'all_cases.tar.bz2')
+OUTPUTS_BZ2 = os.path.join(REPORT_DIR, 'all_outputs.tar.bz2')
+REDUCED_BZ2 = os.path.join(REPORT_DIR, 'all_reduced.tar.bz2')
 
 
 REDUCED_DICT = None
@@ -210,7 +225,33 @@ class TestRun:
         return d
 
 
-def main():
+def tar_bz2(cwd, tarball, path):
+    NEW_NAME = tarball + '.new'
+    with open(NEW_NAME, 'wb') as newf:
+        with subp.Popen(['tar', '-c', path], stdin=subp.DEVNULL,
+                        stdout=subp.PIPE, cwd=cwd) as tar:
+            subp.check_call([BZIP2_COMMAND], stdin=tar.stdout,
+                            stdout=newf)
+    os.rename(NEW_NAME, tarball)
+
+
+def mk_report_dirs():
+    if not os.path.isdir(REPORT_DIR):
+        os.mkdir(REPORT_DIR)
+
+    # extract_cases() wouldn't actually need to be done after the
+    # first time and after adding new cases...
+    extract_cases(SHA_DIR)
+
+    extract_creduced(CR_DIR)
+    extract_outputs(OUT_DIR)
+
+    tar_bz2(REPORT_DIR, CASES_BZ2, 'sha')
+    tar_bz2(REPORT_DIR, REDUCED_BZ2, 'cr')
+    tar_bz2(REPORT_DIR, OUTPUTS_BZ2, 'out')
+
+
+def generate_report_as_string():
     with open('triage_report.pystache.xhtml') as f:
         TEMPLATE = pystache.parse(f.read())
 
@@ -280,7 +321,23 @@ def main():
     context['failures'] = failures
     context['numDistinctFailures'] = len(failures)
 
-    print(pystache.render(TEMPLATE, context))
+    return pystache.render(TEMPLATE, context)
+
+
+def generate_report():
+    NEW = REPORT_FILENAME + '.new'
+    with open(NEW, 'w') as f:
+        f.write(generate_report_as_string())
+    os.rename(NEW, REPORT_FILENAME)
+
+
+def refresh_report():
+    mk_report_dirs()
+    generate_report()
+
+
+def main():
+    print(generate_report_as_string())
 
 
 if __name__ == '__main__':

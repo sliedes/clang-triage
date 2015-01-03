@@ -11,13 +11,29 @@ from repository import update_and_build, get_versions, build
 from run_clang import test_input, test_input_reduce
 from run_creduce import reduce_one
 from dumb_reduce import dumb_reduce
+from triage_report import refresh_report
+
 from config import TRIAGE_EXTRA_CLANG_PARAMS
 
 
+REDUCES_SINCE_REPORT = 0
+
+
+def maybe_refresh_report(unconditional=False):
+    global REDUCES_SINCE_REPORT
+
+    if unconditional or REDUCES_SINCE_REPORT:
+        refresh_report()
+        REDUCES_SINCE_REPORT = 0
+
+
 def reduce_worker_one_iter(db, versions):
+    global REDUCES_SINCE_REPORT
+
     work = db.getCReduceWork()
     if not work:
-        return None
+        maybe_refresh_report()
+        return False
     sha, contents = work
     print('Running creduce for ' + sha + '... ', file=sys.stderr, end='')
     sys.stderr.flush()
@@ -26,6 +42,7 @@ def reduce_worker_one_iter(db, versions):
     if not reason:
         print('Input does not crash.', file=sys.stderr)
         db.addCReduced(versions, sha, CReduceResult.no_crash)
+        REDUCES_SINCE_REPORT += 1
         return True
     reduced = reduce_one(contents, reason)
     if not reduced is None:
@@ -39,6 +56,7 @@ def reduce_worker_one_iter(db, versions):
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
               file=sys.stderr)
         db.addCReduced(versions, sha, CReduceResult.dumb, reduced)
+        REDUCES_SINCE_REPORT += 1
     return True
 
 
@@ -105,10 +123,12 @@ def test_iter(start_from_current=False):
 
 
 def main():
+    global REDUCES_SINCE_REPORT
+
     #test_iter(True)
     while True:
         test_iter(False)
-        subp.call(['./update-hook.sh'])
+        maybe_refresh_report(unconditional=True)
 
 
 if __name__ == '__main__':

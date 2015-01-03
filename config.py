@@ -6,6 +6,15 @@ LLVM_SRC = TOP + '/llvm.src'
 # build directory
 BUILD = TOP + '/clang-triage.ninja'
 
+# The directory to save the HTML report to
+REPORT_DIR = '/home/sliedes/public_html/clang-triage'
+
+# The filename of the actual XHTML report file under REPORT_DIR
+REPORT_FILENAME = 'triage_report.xhtml'
+
+# Change to bzip2 if you don't have the (parallel) pbzip2
+BZIP2_COMMAND = 'pbzip2'
+
 # Parameters to give to ninja to build LLVM. For example, -j8 to run
 # on 8 cores (the default is derived from number of cores available).
 NINJA_PARAMS = []
