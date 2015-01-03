@@ -60,13 +60,18 @@ Setup
        CREATE USER joeuser IN ROLE clang_triage;
        CREATE DATABASE clang_triage OWNER clang_triage;
 
+  b) Alternatively, if you already have a PostgreSQL user and database
+     creation rights, you may just run the command
+
+       createdb clang_triage (or whatever you have set DB_NAME to)
+
 5. Populate the database with the cases by running
 
      ./import_cases.py /path/to/cases
 
-  where /path/to/cases contains your test cases. All files under the
-  directory will be imported, recursively; the filenames do not
-  matter.
+   where /path/to/cases contains your test cases. All files under the
+   directory will be imported, recursively; the filenames do not
+   matter.
 
 6. Now you should be ready to run the bot: run clang_triage.py from the
    clang-triage source directory.
