@@ -1,6 +1,23 @@
+import os
+
+HOME = os.path.expanduser('~')
+
+##### These are probably the most important variables to change:
+
 # This directory does not itself affect anything, but is used in other
 # configuration variables.
-TOP = '/home/sliedes/scratch/build/clang-triage'
+TOP = HOME + '/scratch/build/clang-triage'
+
+# The directory to save the HTML report to
+REPORT_DIR = HOME + '/public_html/clang-triage'
+
+# Change to bzip2 if you don't have the (parallel) pbzip2
+BZIP2_COMMAND = 'pbzip2'
+
+##### You might get away without changing these:
+
+# Name of postgresql database to connect to
+DB_NAME = 'clang_triage'
 
 # git repository directory
 LLVM_SRC = TOP + '/llvm.src'
@@ -8,14 +25,8 @@ LLVM_SRC = TOP + '/llvm.src'
 # build directory
 BUILD = TOP + '/clang-triage.ninja'
 
-# The directory to save the HTML report to
-REPORT_DIR = '/home/sliedes/public_html/clang-triage'
-
 # The filename of the actual XHTML report file under REPORT_DIR
 REPORT_FILENAME = 'triage_report.xhtml'
-
-# Change to bzip2 if you don't have the (parallel) pbzip2
-BZIP2_COMMAND = 'pbzip2'
 
 # Parameters to give to ninja to build LLVM. For example, -j8 to run
 # on 8 cores (the default is derived from number of cores available).
@@ -49,16 +60,13 @@ MIN_GIT_CHECKOUT_INTERVAL = 10*60
 # Give creduce this long to complete before killing it
 CREDUCE_TIMEOUT = 2*60 + 30
 
-# Name of postgresql database to connect to
-DB_NAME = 'clang_triage'
-
 # Save miscellaneous reports in this dir (for example, outputs from
 # failed clang runs where we couldn't determine the precise reason of
 # failure)
 MISC_REPORT_SAVE_DIR = 'saved'
 
 
-# --- Generally you should not need to change anything below this.
+##### Generally you should not need to change anything below this.
 
 
 CREDUCE_PROPERTY_SCRIPT = 'check_creduce_property.py'

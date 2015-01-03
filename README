@@ -44,12 +44,14 @@ Prerequisites
 Setup
 =====
 
-1. edit config.py to match your setup
+1. Edit config.py to match your setup. TOP and REPORT_DIR are probably
+   the most important variables to customize. If you do not have
+   pbzip2, change BZIP2_COMMAND to 'bzip2'.
 
 2. git checkout llvm and tools/clang from the repository you wish to
-   follow to LLVM_SRC as specified in config
+   follow to LLVM_SRC as specified in config.
 
-3. Configure LLVM for cmake/ninja build in BUILD
+3. Configure LLVM for cmake/ninja build in BUILD.
 
   a) Use something like
 
@@ -58,7 +60,7 @@ Setup
 	   -DCLANG_ENABLE_ARCMT=OFF -GNinja
 
   b) You may also build it (no need to install) if you wish - otherwise
-     clang-triage will do that for you
+     clang-triage will do that for you.
 
 4. Create a database with the name in DB_NAME and grant yourself the
    rights to it.
