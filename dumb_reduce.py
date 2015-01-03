@@ -10,6 +10,10 @@ SANITY_CHECKS = True
 
 
 def remove_elem_iter(data, pred):
+    '''Remove one element from the data, which may be a list or a string.
+    If pred is still true for the reduced data, accept it. Repeat
+    until minimal. Yield progressively minimized results.'''
+
     if SANITY_CHECKS:
         assert pred(data)
     curr = 0
@@ -28,24 +32,34 @@ def remove_elem_iter(data, pred):
 
 
 def unlines(xs):
+    'Join xs (list of bytes) by a newline.'
+
     return b'\n'.join(xs)
 
 
 def compose(f, g):
+    'Composed function (f . g). compose(f, g)(x) = f(g(x)).'
+
     return lambda *rest, **kw: f(g(*rest, **kw))
 
 
 def remove_lines(data, pred):
+    'Minimize by removing lines. Yield progressively smaller results.'
+
     data = data.split(b'\n')
     return (unlines(x)
             for x in remove_elem_iter(data, compose(pred, unlines)))
 
 
 def remove_bytes(data, pred):
+    'Minimize by removing bytes. Yield progressively smaller results.'
+
     return remove_elem_iter(data, pred)
 
 
 def verbose_pred(reason):
+    'A more verbose predicate for debugging purposes.'
+
     def pred(data):
         print(data, file=sys.stderr)
         return test_input(data)[0]
@@ -53,6 +67,9 @@ def verbose_pred(reason):
 
 
 def dumb_reduce(data, verbose=False):
+    '''Return a 1-byte-minimal case for data. Removing any byte from the
+    result will make it not crash or crash in a different way.'''
+
     reason = test_input(data)[0]
     assert reason != 'OK'
 

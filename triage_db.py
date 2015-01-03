@@ -13,14 +13,17 @@ from config import DB_NAME, CREATE_SCHEMA_COMMAND
 
 
 class ReduceResult(Enum):
+    'A reduce result.'
+
     # these need not correspond with postgres's internal enum values
-    ok = 1
-    no_crash = 2
-    dumb = 3
+    ok = 1        # Reduced with creduce
+    no_crash = 2  # Did not crash
+    dumb = 3      # Creduce failed, reduced with dumb reducer
 
 
 def read_file(path):
     'Read an entire file as binary.'
+
     with open(path, 'rb') as f:
         return f.read()
 

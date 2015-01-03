@@ -5,6 +5,8 @@ from sha_file_tree import make_sha_tree
 
 
 def extract_cases(path):
+    'Make or update a s/h/sha tree of test cases.'
+
     db = TriageDb()
     make_sha_tree(path, (x[1] for x in db.iterateCases()),
                   suffix='.cpp', rm_old=False)
