@@ -71,7 +71,9 @@ Setup
 
    where /path/to/cases contains your test cases. All files under the
    directory will be imported, recursively; the filenames do not
-   matter.
+   matter. If you wonder where to get cases, get an existing
+   all_cases.tar.bz2 from somewhere or run afl-fuzz (or some similar
+   one) to get new ones.
 
 6. Now you should be ready to run the bot: run clang_triage.py from the
    clang-triage source directory.
