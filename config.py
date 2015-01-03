@@ -1,3 +1,5 @@
+# This directory does not itself affect anything, but is used in other
+# configuration variables.
 TOP = '/home/sliedes/scratch/build/clang-triage'
 
 # git repository directory
@@ -28,7 +30,11 @@ CLANG_PARAMS = ['-Werror', '-ferror-limit=5', '-std=c++11',
                 '-fno-crash-diagnostics', '-xc++', '-c',
                 '-o' '/dev/null', '-']
 
+# Extra clang parameters to use when reducing. If you could disable
+# some slow diagnostics, you could do it here.
 REDUCTION_EXTRA_CLANG_PARAMS = []
+
+# Extra clang parameters to use when triaging.
 TRIAGE_EXTRA_CLANG_PARAMS = []
 
 # A map from human-readable names to directories where to run git pull
