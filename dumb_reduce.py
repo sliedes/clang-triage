@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-#
+
 # Standalone, this can be used a dumb reducer of crashing test cases
 # given as stdin.
 

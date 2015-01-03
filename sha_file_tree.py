@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 from hashlib import sha1
 import sys
