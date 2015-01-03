@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import subprocess as subp
 import time
 
 import multiprocessing.dummy as mp

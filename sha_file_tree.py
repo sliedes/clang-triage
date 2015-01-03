@@ -2,7 +2,6 @@
 
 import os
 from hashlib import sha1
-from shutil import rmtree
 import sys
 
 from utils import all_files_recursive
