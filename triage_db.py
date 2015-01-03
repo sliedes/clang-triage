@@ -12,24 +12,27 @@ from utils import all_files_recursive
 from config import DB_NAME, CREATE_SCHEMA_COMMAND
 
 
-class CReduceResult(Enum):
+class ReduceResult(Enum):
     # these need not correspond with postgres's internal enum values
     ok = 1
-    failed = 2
-    no_crash = 3
-    dumb = 4
+    no_crash = 2
+    dumb = 3
 
 
 def read_file(path):
+    'Read an entire file as binary.'
     with open(path, 'rb') as f:
         return f.read()
 
 
 class DbNotInitialized(Exception):
+    "Thrown by TriageDb() when the schema has not been created."
     pass
 
 
 class TriageDb(object):
+    'Triage database.'
+
     def __init__(self):
         self.conn = pg.connect(database=DB_NAME)
         with self.conn:
@@ -43,6 +46,7 @@ class TriageDb(object):
 
     @staticmethod
     def createSchema():
+        'Create the database schema.'
         print('Creating database schema...', file=sys.stderr)
         try:
             subp.check_call(CREATE_SCHEMA_COMMAND, stderr=subp.STDOUT)
@@ -52,16 +56,19 @@ class TriageDb(object):
             raise
 
     def doesCaseExist(self, sha):
+        'Check if a case exists in the database.'
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT COUNT(*) FROM cases WHERE sha1=%s', sha)
                 return bool(c.fetchone()[0])
 
     def addCase(self, sha, contents):
+        'Add a case. It must not aldeary exist.'
         self.addCases([(sha, contents)])
 
     # FIXME this may be slow?
     def addCases(self, cases):
+        'Add several cases.'
         with self.conn:
             with self.conn.cursor() as c:
                 c.executemany(
@@ -71,6 +78,8 @@ class TriageDb(object):
                      for x in cases))
 
     def populateCases(self, cases_path, stop_after=None):
+        '''Add files from a directory, recursively, as cases. Filenames do not
+        matter.'''
         case_files = all_files_recursive(cases_path)
 
         if stop_after:
@@ -95,18 +104,21 @@ class TriageDb(object):
             return ((x[0], zlib.decompress(x[1])) for x in c)
 
     def iterateDistinctReduced(self):
+        'Iterate through distinct reduced cases.'
         with self.conn:
             c = self.conn.cursor()
-            c.execute('SELECT DISTINCT contents FROM creduced_contents')
+            c.execute('SELECT DISTINCT contents FROM reduced_contents')
             return (x[0] for x in c)
 
     def iterateOutputs(self):
+        'Iterate through compiler outputs.'
         with self.conn:
             c = self.conn.cursor()
             c.execute('SELECT output FROM outputs')
             return (zlib.decompress(x[0]) for x in c)
 
     def getNumberOfCases(self):
+        'Get the number of cases in the database.'
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute('SELECT count(*) from case_contents')
@@ -114,7 +126,8 @@ class TriageDb(object):
 
     def _addTestRun(self, versions, start_time, end_time, results):
         '''results: [(sha, result_string, output)].
-        Output may be None if result_string="OK".'''
+        Output is ignored if result_string="OK".'''
+
         assert 'clang' in versions, versions
         assert 'llvm' in versions, versions
         clang_version = versions['clang']
@@ -128,19 +141,20 @@ class TriageDb(object):
                     (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)
-                # delete changed creduce results where new result != OK
-                c.execute("DELETE FROM creduced_cases WHERE original IN (" +
+                # delete changed reduce results where new result != OK
+                c.execute("DELETE FROM reduced_cases WHERE original IN (" +
                           "    SELECT case_id FROM changed_results " +
                           "    WHERE new<>%s)",
                           (self.OK_ID, ))
 
     def testRun(self, versions):
-        'A context manager for test runs.'
+        'Get a context manager for test runs.'
         return TriageDb.TestRunContext(self, versions)
 
     def _addResults(self, cursor, run_id, results):
         '''results: [(sha, result_string, output)].
-        Output may be None if result_string="OK".'''
+        Output is ignored if result_string="OK".'''
+
         c = cursor
         # insert result strings if they do not already exist
         unique_results = set(x[1] for x in results)
@@ -166,6 +180,7 @@ class TriageDb(object):
     def getLastRunTimeByVersions(self, versions):
         '''Returns (start_time, end_time) of the test run with these versions.
            If no test has been run with this version, returns None.'''
+
         assert 'clang' in versions, versions
         assert 'llvm' in versions, versions
         clang_version = versions['clang']
@@ -181,8 +196,9 @@ class TriageDb(object):
                           'LIMIT 1', (clang_version, llvm_version))
                 return c.fetchone()
 
-    def getCReduceWork(self):
-        'Get (sha, content) pair to run through creduce. None if none.'
+    def getReduceWork(self):
+        'Get a (sha, content) pair to run through reduce. None if none.'
+
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(
@@ -193,12 +209,13 @@ class TriageDb(object):
             return None
         return (r[0], zlib.decompress(r[1]))
 
-    def addCReduced(self, versions, sha, result, contents=None):
-        if result == CReduceResult.ok or result == CReduceResult.dumb:
+    def addReduced(self, versions, sha, result, contents=None):
+        'Add a reduced case.'
+
+        if result == ReduceResult.ok or result == ReduceResult.dumb:
             assert contents, 'Result OK or dumb but no contents?'
         else:
-            assert (result == CReduceResult.failed or
-                    result == CReduceResult.no_crash), result
+            assert result == ReduceResult.no_crash, result
             assert contents is None
         llvm_version = versions['llvm']
         clang_version = versions['clang']
@@ -208,18 +225,20 @@ class TriageDb(object):
                 case_id = c.fetchone()
                 assert case_id, sha
                 case_id = case_id[0]
-                c.execute('INSERT INTO creduced_cases (original, ' +
+                c.execute('INSERT INTO reduced_cases (original, ' +
                           '    clang_version, llvm_version, result) ' +
                           'VALUES (%s, %s, %s, %s) RETURNING id', (
                               case_id, clang_version, llvm_version,
                               result.name))
                 cr_id = c.fetchone()[0]
                 if not contents is None:
-                    c.execute('INSERT INTO creduced_contents ' +
-                              '    (creduced_id, contents) ' +
+                    c.execute('INSERT INTO reduced_contents ' +
+                              '    (reduced_id, contents) ' +
                               'VALUES (%s, %s)', (cr_id, contents))
 
     class TestRunContext(object):
+        'A context manager for test runs.'
+
         def __init__(self, db, versions):
             self.db = db
             self.versions = versions
@@ -237,5 +256,5 @@ class TriageDb(object):
                                     self.results)
 
         def addResult(self, sha, result_string, output):
-            'Output will be ignored if result_string="OK".'
+            'Add a result. Output will be ignored if result_string="OK".'
             self.results.append((sha, result_string, output))

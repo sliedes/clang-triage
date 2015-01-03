@@ -9,7 +9,7 @@ import os
 import subprocess as subp
 
 from extract_cases import extract_cases
-from extract_creduced import extract_creduced
+from extract_reduced import extract_reduced
 from extract_outputs import extract_outputs
 
 from config import DB_NAME, REPORT_DIR, BZIP2_COMMAND, REPORT_FILENAME
@@ -79,7 +79,7 @@ def get_reduce_queue_size(db):
 def get_num_reduced(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
-                  "FROM creduced_cases " +
+                  "FROM reduced_cases " +
                   "WHERE result='ok' OR result='dumb'")
         return c.fetchone()[0]
 
@@ -87,7 +87,7 @@ def get_num_reduced(db):
 def get_num_dumb_reduced(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
-                  "FROM creduced_cases " +
+                  "FROM reduced_cases " +
                   "WHERE result='dumb'")
         return c.fetchone()[0]
 
@@ -95,7 +95,7 @@ def get_num_dumb_reduced(db):
 def get_num_distinct_reduced(db):
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT contents) " +
-                  "FROM creduced_contents")
+                  "FROM reduced_contents")
         return c.fetchone()[0]
 
 
@@ -243,7 +243,7 @@ def mk_report_dirs():
     # first time and after adding new cases...
     extract_cases(SHA_DIR)
 
-    extract_creduced(CR_DIR)
+    extract_reduced(CR_DIR)
     extract_outputs(OUT_DIR)
 
     tar_bz2(REPORT_DIR, CASES_BZ2, 'sha')

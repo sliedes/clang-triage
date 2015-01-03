@@ -63,7 +63,7 @@ def update_all(versions, idle_func=const(False)):
     '''Update repositories if interval has passed. If not, call idle_func
     until it has. If idle_func returns False, just sleep.'''
     global LAST_UPDATED
-    # run creduce or sleep until we're allowed to update again
+    # run reduce or sleep until we're allowed to update again
     while True:
         elapsed = time.time() - LAST_UPDATED
         left = MIN_GIT_CHECKOUT_INTERVAL - elapsed

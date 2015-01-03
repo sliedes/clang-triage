@@ -1,5 +1,5 @@
 \i case_view.sql
-\i creduce.sql
+\i reduce.sql
 \i test_runs.sql
 
 CREATE VIEW last_2_runs_view AS

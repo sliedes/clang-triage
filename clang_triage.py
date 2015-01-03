@@ -5,7 +5,7 @@ import time
 
 import multiprocessing.dummy as mp
 
-from triage_db import TriageDb, CReduceResult
+from triage_db import TriageDb, ReduceResult
 from repository import update_and_build, get_versions, build
 from run_clang import test_input, test_input_reduce
 from run_creduce import reduce_one
@@ -29,7 +29,7 @@ def maybe_refresh_report(unconditional=False):
 def reduce_worker_one_iter(db, versions):
     global REDUCES_SINCE_REPORT
 
-    work = db.getCReduceWork()
+    work = db.getReduceWork()
     if not work:
         maybe_refresh_report()
         return False
@@ -40,21 +40,21 @@ def reduce_worker_one_iter(db, versions):
     assert test_input(contents, [])[0] == reason
     if not reason:
         print('Input does not crash.', file=sys.stderr)
-        db.addCReduced(versions, sha, CReduceResult.no_crash)
+        db.addReduced(versions, sha, ReduceResult.no_crash)
         REDUCES_SINCE_REPORT += 1
         return True
     reduced = reduce_one(contents, reason)
     if not reduced is None:
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
               file=sys.stderr)
-        db.addCReduced(versions, sha, CReduceResult.ok, reduced)
+        db.addReduced(versions, sha, ReduceResult.ok, reduced)
     else:
         # creduce failed, run dumb reduce that does not fail
         print('Running dumb reducer...', file=sys.stderr)
         reduced = dumb_reduce(contents)
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
               file=sys.stderr)
-        db.addCReduced(versions, sha, CReduceResult.dumb, reduced)
+        db.addReduced(versions, sha, ReduceResult.dumb, reduced)
         REDUCES_SINCE_REPORT += 1
     return True
 

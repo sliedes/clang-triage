@@ -47,25 +47,25 @@ def dump_test_runs(db, fp):
     print(file=fp)
 
 
-def dump_creduced_cases(db, fp):
+def dump_reduced_cases(db, fp):
     with db.cursor() as c:
         c.execute('SELECT id, original, clang_version, llvm_version, ' +
-                  '    result FROM creduced_cases ORDER BY id')
+                  '    result FROM reduced_cases ORDER BY id')
         for id_, original, clang_version, llvm_version, result in c:
             res = {'id': id_, 'original': original,
                    'clang_version': clang_version,
                    'llvm_version': llvm_version, 'result': result}
-            json.dump({'creduced_case': res}, fp)
+            json.dump({'reduced_case': res}, fp)
             print(file=fp)
 
 
-def dump_creduced_contents(db, fp):
+def dump_reduced_contents(db, fp):
     with db.cursor() as c:
-        c.execute('SELECT creduced_id, contents FROM creduced_contents ' +
-                  '    ORDER BY creduced_id')
+        c.execute('SELECT reduced_id, contents FROM reduced_contents ' +
+                  '    ORDER BY reduced_id')
         for id_, contents in c:
             res = {'id': id_, 'contents': bytes(contents)}
-            json.dump({'creduced_case': res}, fp, default=bytes_to_json)
+            json.dump({'reduced_case': res}, fp, default=bytes_to_json)
             print(file=fp)
 
 
@@ -103,8 +103,8 @@ def dump_all(db, fp):
     dump_case_id_sha1(db, sys.stdout)
     dump_case_contents(db, sys.stdout)
     dump_test_runs(db, sys.stdout)
-    dump_creduced_cases(db, sys.stdout)
-    dump_creduced_contents(db, sys.stdout)
+    dump_reduced_cases(db, sys.stdout)
+    dump_reduced_contents(db, sys.stdout)
     dump_outputs(db, sys.stdout)
     dump_result_strings(db, sys.stdout)
     dump_results(db, sys.stdout)
