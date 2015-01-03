@@ -6,7 +6,9 @@ from sha_file_tree import make_sha_tree
 
 def extract_outputs(path):
     db = TriageDb()
-    make_sha_tree(path, db.iterateOutputs(), suffix='.txt', rm_old=False)
+    # Unlike cases and reduced cases, we wish to remove old outputs.
+    # They vary a lot, and we can't just accumulate them forever.
+    make_sha_tree(path, db.iterateOutputs(), suffix='.txt', rm_old=True)
 
 
 def main():

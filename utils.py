@@ -13,3 +13,9 @@ def env_with_tmpdir(path):
 def const(x):
     'Returns a constant function.'
     return lambda *a, **b: x
+
+
+def all_files_recursive(path, followlinks=True):
+    for root, dirs, files in os.walk(path, followlinks=followlinks):
+        for f in files:
+            yield os.path.join(root, f)

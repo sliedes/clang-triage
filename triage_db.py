@@ -10,6 +10,7 @@ import subprocess as subp
 from enum import Enum
 import sys
 
+from utils import all_files_recursive
 from config import DB_NAME, CREATE_SCHEMA_COMMAND
 
 
@@ -21,13 +22,7 @@ class CReduceResult(Enum):
     dumb = 4
 
 
-def allFilesRecursive(path):
-    for root, dirs, files in os.walk(path, followlinks=True):
-        for f in files:
-            yield os.path.join(root, f)
-
-
-def readFile(path):
+def read_file(path):
     with open(path, 'rb') as f:
         return f.read()
 
@@ -78,14 +73,14 @@ class TriageDb(object):
                      for x in cases))
 
     def populateCases(self, cases_path, stop_after=None):
-        case_files = allFilesRecursive(cases_path)
+        case_files = all_files_recursive(cases_path)
 
         if stop_after:
             case_files = itertools.islice(case_files, 0, stop_after)
 
         def cases_iter():
             for fname in case_files:
-                contents = readFile(os.path.join(cases_path, fname))
+                contents = read_file(os.path.join(cases_path, fname))
                 sha = hashlib.sha1(contents).hexdigest()
                 yield (sha, contents)
 
