@@ -19,6 +19,9 @@ REDUCES_SINCE_REPORT = 0
 
 
 def maybe_refresh_report(unconditional=False):
+    '''Refresh the XHTML report if either unconditional is True or new
+    cases have been reduced since the report was last refreshed.'''
+
     global REDUCES_SINCE_REPORT
 
     if unconditional or REDUCES_SINCE_REPORT:
@@ -27,6 +30,8 @@ def maybe_refresh_report(unconditional=False):
 
 
 def reduce_worker_one_iter(db, versions):
+    'Fetch reduce work and process it. Returns True if there was work.'
+
     global REDUCES_SINCE_REPORT
 
     work = db.getReduceWork()
@@ -60,6 +65,9 @@ def reduce_worker_one_iter(db, versions):
 
 
 def update_and_check_if_should_run(db):
+    '''git update and build repositories and see if the versions have
+    already been tested.'''
+
     versions = get_versions()
     idle_func = lambda: reduce_worker_one_iter(db, versions)
     if not update_and_build(idle_func):
@@ -124,7 +132,6 @@ def test_iter(start_from_current=False):
 def main():
     global REDUCES_SINCE_REPORT
 
-    #test_iter(True)
     while True:
         test_iter(False)
         maybe_refresh_report(unconditional=True)

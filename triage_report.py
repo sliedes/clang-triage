@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# FIXME this module does not use TriageDb(). Perhaps it should be
+# modified to, although the queries it does are rather separate from
+# what other modules do.
+
 import psycopg2 as pg
 import pystache
 import time
@@ -33,6 +37,8 @@ OUTPUT_SHA_DICT = None
 
 
 def fetch_reduced_dict(db):
+    'Get a {case_sha1: reduced_sha1} dictionary of all reduced cases.'
+
     global REDUCED_DICT, REDUCED_SHA_DICT
     with db.cursor() as c:
         c.execute('SELECT sha1, contents FROM sha_reduced_view ')
@@ -42,6 +48,8 @@ def fetch_reduced_dict(db):
 
 
 def fetch_output_dict(db):
+    'Get a {case_sha1: output_sha1} dictionary of all failed cases.'
+
     global OUTPUT_SHA_DICT
     with db.cursor() as c:
         c.execute('SELECT sha1, output FROM sha_output_view')
@@ -50,8 +58,9 @@ def fetch_output_dict(db):
             for x in c.fetchall())
 
 
-# RFC 2822
 def asctime(t=None):
+    'RFC 2822 format a time.'
+
     fmt = '%a, %d %b %Y %H:%M:%S %z'
     if t is None:
         return time.strftime(fmt)
@@ -59,7 +68,11 @@ def asctime(t=None):
         return time.strftime(fmt, t)
 
 
+# FIXME this function is confusing (two return values), split it.
 def fetch_failures(db, run_id):
+    '''Fetch a {sha1: result_str} dict of results and a {sha1: size} dict
+    of reduced sizes.'''
+
     with db.cursor() as c:
         c.execute('SELECT sha1, str FROM results_view ' +
                   'WHERE test_run=%s', (run_id, ))
@@ -71,12 +84,16 @@ def fetch_failures(db, run_id):
 
 
 def get_reduce_queue_size(db):
+    'Get the number of items in reduce queue.'
+
     with db.cursor() as c:
         c.execute('SELECT COUNT(*) FROM unreduced_cases_view')
         return c.fetchone()[0]
 
 
 def get_num_reduced(db):
+    'Get the number of reduced items.'
+
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
                   "FROM reduced_cases " +
@@ -85,6 +102,8 @@ def get_num_reduced(db):
 
 
 def get_num_dumb_reduced(db):
+    'Get the number of items reduced by dumb reduce after creduce failed.'
+
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT original) " +
                   "FROM reduced_cases " +
@@ -93,6 +112,8 @@ def get_num_dumb_reduced(db):
 
 
 def get_num_distinct_reduced(db):
+    'Get the number of reduced cases that are distinct.'
+
     with db.cursor() as c:
         c.execute("SELECT COUNT(DISTINCT contents) " +
                   "FROM reduced_contents")
@@ -100,6 +121,8 @@ def get_num_distinct_reduced(db):
 
 
 def get_num_runs_completed(db):
+    'Get the number of completed test runs.'
+
     with db.cursor() as c:
         c.execute("SELECT COUNT(*) " +
                   "FROM test_runs")
@@ -107,6 +130,8 @@ def get_num_runs_completed(db):
 
 
 def case_dict(sha):
+    'Create a pystache context of a case.'
+
     reduced = REDUCED_SHA_DICT.get(sha)
     output = OUTPUT_SHA_DICT.get(sha)
     d = {'case': sha, 'shortCase': sha[0:6],
@@ -123,6 +148,8 @@ def case_dict(sha):
 
 
 def build_failure_context(reason, old_reason, cases):
+    'Create a pystache context of a single type of failure change.'
+
     ds = [case_dict(case) for case in cases]
     ds[-1]['isLast'] = True
     num_cases = len(ds)
@@ -135,7 +162,12 @@ def build_failure_context(reason, old_reason, cases):
     return d
 
 
+# FIXME this name is confusable with python's string splits.
 def split_by(pred, xs):
+    '''Split a list into two by a predicate. The first list will contain
+    those values for which pred is False and the second one those for
+    which it is True.'''
+
     a = ([], [])
 
     for x in xs:
@@ -145,6 +177,9 @@ def split_by(pred, xs):
 
 
 def sort_cases(cases, reduced_sizes):
+    '''Sort cases into presentation order: unique reduced + not_reduced +
+    duplicate_reduced.'''
+
     not_reduced, reduced = split_by(lambda x: x in REDUCED_DICT, cases)
     not_reduced.sort()
 
@@ -167,7 +202,8 @@ def sort_cases(cases, reduced_sizes):
 
 
 def group_changed_failures(changed_fails, reduced_sizes):
-    'changed_fails: [(sha1, reason, prev_reason)]'
+    '''Group by (reason, prev_reason).
+    changed_fails: [(sha1, reason, prev_reason)].'''
 
     groups = {}
     for sha, reason, prev_reason in changed_fails:
@@ -183,6 +219,8 @@ def group_changed_failures(changed_fails, reduced_sizes):
 
 
 class TestRun:
+    'A container for data of a single test run.'
+
     def __init__(self, db, run_id, start_time, end_time, clang_ver, llvm_ver):
         self.db = db
         self.run_id = run_id
@@ -194,6 +232,8 @@ class TestRun:
         self.version = 'clang {}, llvm {}'.format(clang_ver, llvm_ver)
 
     def ctx(self, prev=None):
+        'Create a pystache context of a test run.'
+
         prev_fails = {}
         prev_version = []
         if prev:
@@ -226,6 +266,8 @@ class TestRun:
 
 
 def tar_bz2(cwd, tarball, path):
+    'Create a .tar.bz of a path in a directory.'
+
     NEW_NAME = tarball + '.new'
     with open(NEW_NAME, 'wb') as newf:
         with subp.Popen(['tar', '-c', path], stdin=subp.DEVNULL,
@@ -236,6 +278,8 @@ def tar_bz2(cwd, tarball, path):
 
 
 def mk_report_dirs():
+    'Create or refresh the report directory.'
+
     if not os.path.isdir(REPORT_DIR):
         os.mkdir(REPORT_DIR)
 
@@ -252,6 +296,8 @@ def mk_report_dirs():
 
 
 def generate_report_as_string():
+    'Generate an XHTML report.'
+
     with open('triage_report.pystache.xhtml') as f:
         TEMPLATE = pystache.parse(f.read())
 
@@ -325,6 +371,8 @@ def generate_report_as_string():
 
 
 def generate_report():
+    'Generate an XHTML report and save it to REPORT_FILENAME.'
+
     NEW = REPORT_FILENAME + '.new'
     with open(NEW, 'w') as f:
         f.write(generate_report_as_string())
@@ -332,6 +380,8 @@ def generate_report():
 
 
 def refresh_report():
+    'Create or refresh the report and its supporting files.'
+
     mk_report_dirs()
     generate_report()
 

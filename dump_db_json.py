@@ -12,12 +12,16 @@ import sys
 
 
 def bytes_to_json(obj):
+    "Encode bytes as a repr(bytes) and set __method__ to 'eval'."
+
     if isinstance(obj, bytes):
         return {'__method__': 'eval', '__value__': repr(obj)}
     raise TypeError(repr(obj) + ' is not JSON serializable')
 
 
 def dump_case_id_sha1(db, fp):
+    'Dump the cases table as JSON.'
+
     with db.cursor() as c:
         c.execute('SELECT id, sha1 FROM cases ORDER BY id')
         results = c.fetchall()
@@ -27,6 +31,9 @@ def dump_case_id_sha1(db, fp):
 
 
 def dump_case_contents(db, fp):
+    '''Dump case contents as a newline-separated series of JSON
+    objects.'''
+
     with db.cursor() as c:
         c.execute('SELECT id, z_contents FROM case_view ORDER BY id')
         for id_, z_contents in c:
@@ -36,6 +43,8 @@ def dump_case_contents(db, fp):
 
 
 def dump_test_runs(db, fp):
+    'Dump test runs as JSON.'
+
     with db.cursor() as c:
         c.execute('SELECT id, start_time, end_time, clang_version, ' +
                   '    llvm_version FROM test_runs ORDER BY id')
@@ -48,6 +57,9 @@ def dump_test_runs(db, fp):
 
 
 def dump_reduced_cases(db, fp):
+    '''Dump reduced case metadata as a newline-separated series of JSON
+    objects.'''
+
     with db.cursor() as c:
         c.execute('SELECT id, original, clang_version, llvm_version, ' +
                   '    result FROM reduced_cases ORDER BY id')
@@ -60,6 +72,9 @@ def dump_reduced_cases(db, fp):
 
 
 def dump_reduced_contents(db, fp):
+    '''Dump reduced case contents as a newline-separated series of JSON
+    objects.'''
+
     with db.cursor() as c:
         c.execute('SELECT reduced_id, contents FROM reduced_contents ' +
                   '    ORDER BY reduced_id')
@@ -70,6 +85,9 @@ def dump_reduced_contents(db, fp):
 
 
 def dump_outputs(db, fp):
+    '''Dump clang outputs from failed cases as a newline-separated series
+    of JSON objects.'''
+
     with db.cursor() as c:
         c.execute('SELECT case_id, output FROM outputs ' +
                   '    ORDER BY case_id')
@@ -80,6 +98,8 @@ def dump_outputs(db, fp):
 
 
 def dump_result_strings(db, fp):
+    'Dump result strings as JSON.'
+
     with db.cursor() as c:
         c.execute('SELECT id, str FROM result_strings ORDER BY id')
         results = c.fetchall()
@@ -89,6 +109,8 @@ def dump_result_strings(db, fp):
 
 
 def dump_results(db, fp):
+    'Dump results as a newline-separated series of JSON objects.'
+
     with db.cursor() as c:
         c.execute('SELECT id, case_id, test_run, result ' +
                   '    FROM results ORDER BY id')
@@ -100,6 +122,9 @@ def dump_results(db, fp):
 
 
 def dump_all(db, fp):
+    '''Dump the entire database as a newline-separated series of JSON
+    objects.'''
+
     dump_case_id_sha1(db, sys.stdout)
     dump_case_contents(db, sys.stdout)
     dump_test_runs(db, sys.stdout)
@@ -114,6 +139,7 @@ def main():
     db = pg.connect(database=DB_NAME)
     with db:
         dump_all(db, sys.stdout)
+
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,5 @@
 import os
 from hashlib import sha1
-import sys
 
 from utils import all_files_recursive
 
@@ -9,22 +8,9 @@ __all__ = ['make_sha_tree']
 DIGITS = '0123456789abcdef'
 
 
-def looks_like_sha_tree(path):
-    assert os.path.isdir(path)
-    li = os.listdir(path)
-    for x in os.listdir(path):
-        if not x in DIGITS:
-            print("{} doesn't look like it belongs to a sha tree.".format(
-                os.path.join(path, x)), file=sys.stderr)
-            return False
-    if len(li) != len(DIGITS):
-        print("{} lacks some of the hex digit dirs.".format(path),
-              file=sys.stderr)
-        return False
-    return True
-
-
 def make_empty_sha_tree(path):
+    'Make a s/h/sha tree (two levels deep sha tree).'
+
     os.mkdir(path)
     for x in DIGITS:
         os.mkdir(os.path.join(path, x))
@@ -33,6 +19,9 @@ def make_empty_sha_tree(path):
 
 
 def rm_files_not_in(path, new_files):
+    '''Go through all files in path. Assert that all files in new_files are
+    there; remove any other files.'''
+
     new_files = set(new_files)
     to_rm = []
     for fname in all_files_recursive(path, followlinks=False):
@@ -56,7 +45,8 @@ def rm_files_not_in(path, new_files):
 
 
 def make_sha_tree(path, contentses, suffix='', rm_old=False):
-    'Make a two-level sha tree rooted on path.'
+    '''Make or update a two-level sha tree rooted on path. Remove old
+    files if rm_old=True.'''
 
     if not os.path.isdir(path):
         make_empty_sha_tree(path)

@@ -12,6 +12,8 @@ from config import CREDUCE_PROPERTY_SCRIPT, CREDUCE_TIMEOUT
 
 
 def run_creduce(data, reason):
+    'Run CReduce for the data. Give crash reason in reason.'
+
     assert reason, 'Cannot run_creduce() on a non-crashing input.'
     assert (os.path.isfile(CREDUCE_PROPERTY_SCRIPT) and
             os.access(CREDUCE_PROPERTY_SCRIPT, os.X_OK)), (
@@ -56,6 +58,8 @@ PRINTABLE = string.printable.encode('ascii')
 
 
 def try_remove_nonprintables(contents, reason):
+    'Minimize the case wrt non-printable characters.'
+
     reduced = b''
     for i in range(len(contents)):
         if not contents[i] in PRINTABLE:
@@ -79,6 +83,8 @@ def try_remove_nonprintables(contents, reason):
 
 
 def reduce_one(data, reason):
+    'CReduce this case, then minimize it wrt nonprintables.'
+
     res = run_creduce(data, reason)
     if not res:
         return None
@@ -88,6 +94,7 @@ def reduce_one(data, reason):
 def main():
     data = sys.stdin.buffer.read()
     print(reduce_one(data, test_input(data)[0]))
+
 
 if __name__ == '__main__':
     main()

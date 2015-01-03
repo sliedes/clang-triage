@@ -9,7 +9,9 @@ from config import REDUCTION_EXTRA_CLANG_PARAMS
 from config import DUMMY_LLVM_SYMBOLIZER_PATH
 
 
-def save_data(prefix, data):
+def save_misc_report(prefix, data):
+    'Save a miscellaneous report.'
+
     t = int(time.time())
     if not os.path.isdir(MISC_REPORT_SAVE_DIR):
         os.path.mkdir(MISC_REPORT_SAVE_DIR)
@@ -25,6 +27,9 @@ def save_data(prefix, data):
 
 
 def check_for_clang_crash(output, retval):
+    '''Inspect the output and retval and return a string describing the
+    crash, if any, or None if no crash.'''
+
     # timeout -> return value 124 (per timeout manual)
     if output.find(b'Segmentation fault') != -1:
         return 'SEGV'
@@ -38,7 +43,10 @@ def check_for_clang_crash(output, retval):
     if a != -1:
         return output[a:].split(b'\n', 1)[0].decode('utf-8')
     if output.find(b'Stack dump:') != -1:
-        save_data('stack-dump', output)
+        # The output contains a stack dump, but we couldn't determine
+        # a more precise reason for the crash. Save a miscellaneous
+        # report and continue.
+        save_misc_report('stack-dump', output)
         return 'Stack dump found'
     if retval > 128:
         return 'Killed by signal %d' % (retval-128)
@@ -46,6 +54,8 @@ def check_for_clang_crash(output, retval):
 
 
 def test_input(data, extra_params=[], extra_path=[]):
+    'Test the input and return (crash_reason, output).'
+
     CMD = CLANG_TIMEOUT_CMD + [CLANG_BINARY] + CLANG_PARAMS + extra_params
     env = copy.copy(os.environ)
     path = os.pathsep.join(extra_path + env['PATH'].split(os.pathsep))
@@ -58,6 +68,9 @@ def test_input(data, extra_params=[], extra_path=[]):
 
 
 def test_input_reduce(data):
+    '''Test the input, but avoid running llvm-symbolizer since it is slow
+    and we don't care about the output being symbolized.'''
+
     return test_input(
         data, extra_params=REDUCTION_EXTRA_CLANG_PARAMS,
         extra_path=[os.path.abspath(DUMMY_LLVM_SYMBOLIZER_PATH)])

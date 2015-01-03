@@ -7,6 +7,8 @@ from config import PROJECTS, MIN_GIT_CHECKOUT_INTERVAL, NINJA_PARAMS, BUILD
 
 
 class CommitInfo(object):
+    'Information of a single git commit.'
+
     def __git(self, fmt):
         CMD = ['git', 'show', '-s', '--format='+fmt, self.name]
         out = subp.check_output(CMD, cwd=self.path).decode('utf-8')
@@ -43,6 +45,8 @@ class CommitInfo(object):
 
 
 def git_pull(path):
+    'Execute git pull in a path. Redo until success.'
+
     success = False
     while not success:
         try:
@@ -56,16 +60,18 @@ def git_pull(path):
             time.sleep(30)
 
 
-LAST_UPDATED = 0
+LAST_UPDATED_TIME = 0
 
 
 def update_all(versions, idle_func=const(False)):
-    '''Update repositories if interval has passed. If not, call idle_func
-    until it has. If idle_func returns False, just sleep.'''
-    global LAST_UPDATED
+    '''Update repositories if MIN_GIT_CHECKOUT_INTERVAL has passed. If
+    not, call idle_func until it has. If idle_func returns False, just
+    sleep.'''
+
+    global LAST_UPDATED_TIME
     # run reduce or sleep until we're allowed to update again
     while True:
-        elapsed = time.time() - LAST_UPDATED
+        elapsed = time.time() - LAST_UPDATED_TIME
         left = MIN_GIT_CHECKOUT_INTERVAL - elapsed
         if left <= 0:
             break
@@ -76,12 +82,13 @@ def update_all(versions, idle_func=const(False)):
             time.sleep(left)
     for proj, path in PROJECTS.items():
         git_pull(path)
-    LAST_UPDATED = time.time()
+    LAST_UPDATED_TIME = time.time()
     return True
 
 
 def get_versions():
     'Returns a dict of svn revisions.'
+
     out = {}
     for proj, path in PROJECTS.items():
         info = CommitInfo(path)
@@ -91,6 +98,8 @@ def get_versions():
 
 
 def build():
+    'Build LLVM/Clang. Returns True on success, False on failure.'
+
     try:
         subp.check_call(['ninja'] + NINJA_PARAMS, cwd=BUILD)
     except subp.CalledProcessError:
@@ -100,6 +109,9 @@ def build():
 
 
 def update_and_build(idle_func=const(False)):
+    '''Update and build LLVM/Clang. Returns True on success, False on
+    failure.'''
+
     versions = get_versions()
     print('Version: ' + str(versions))
     if not update_all(versions, idle_func):
