@@ -3,7 +3,7 @@
 import sys
 import time
 
-import multiprocessing.dummy as mp
+import multiprocessing as mp
 
 from triage_db import TriageDb, ReduceResult
 from repository import update_and_build, get_versions, build
@@ -88,6 +88,12 @@ def update_and_check_if_should_run(db):
     return True
 
 
+def triage_test_func(sha_data):
+    'A test function to be run by the worker threads.'
+    return (sha_data[0],
+            test_input(sha_data[1], TRIAGE_EXTRA_CLANG_PARAMS))
+
+
 def test_iter(start_from_current=False):
     '''Build new version if available and execute tests.
     Returns False if no new versions were available and nothing done.'''
@@ -111,10 +117,8 @@ def test_iter(start_from_current=False):
         i = 1
         numBad = 0
         with mp.Pool() as pool:
-            test_func = lambda sha_data: (sha_data[0], test_input(
-                sha_data[1], TRIAGE_EXTRA_CLANG_PARAMS))
             for sha, (reason, output) in pool.imap_unordered(
-                    test_func, db.iterateCases()):
+                    triage_test_func, db.iterateCases()):
                 if not reason:
                     reason = 'OK'
                     output = None
@@ -131,6 +135,8 @@ def test_iter(start_from_current=False):
 
 def main():
     global REDUCES_SINCE_REPORT
+
+    mp.set_start_method('forkserver')
 
     while True:
         test_iter(False)
