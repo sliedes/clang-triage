@@ -4,6 +4,7 @@ import sys
 import time
 import multiprocessing as mp
 import argparse as argp
+import shutil
 
 from triage_db import TriageDb, ReduceResult
 from repository import update_and_build, get_versions, build
@@ -12,7 +13,7 @@ from run_creduce import reduce_one
 from dumb_reduce import dumb_reduce
 from triage_report import refresh_report
 
-from config import TRIAGE_EXTRA_CLANG_PARAMS
+from config import TRIAGE_EXTRA_CLANG_PARAMS, BZIP2_COMMAND
 
 
 REDUCES_SINCE_REPORT = 0
@@ -134,8 +135,31 @@ def test_iter(start_from_current=False):
         print(file=sys.stderr)
 
 
+def check_prereqs():
+    WARN = [('llvm-symbolizer', 'Recorded outputs may be less useful.'),
+            ('psql', 'Schema creation will not work.')]
+
+    for prog, warn in WARN:
+        if shutil.which(prog) is None:
+            print('WARNING: No {} found in PATH. {}'.format(prog, warn),
+                  file=sys.stderr)
+
+    REQS = ['git', 'ninja', 'creduce', 'timeout', 'tar', BZIP2_COMMAND]
+
+    err = False
+    for prog in REQS:
+        if shutil.which(prog) is None:
+            print('Error: No {} in PATH.'.format(prog), file=sys.stderr)
+            err = True
+
+    if err:
+        sys.exit(1)
+
+
 def main():
     global REDUCES_SINCE_REPORT
+
+    check_prereqs()
 
     mp.set_start_method('forkserver')
 

@@ -12,9 +12,6 @@ Triage engine
 * Write code to tell apart creduce failure from failure in our
   property check script?
 
-* Check that llvm-symbolizer is on path, since that makes the outputs
-  much more readable.
-
 * On clang executions, somehow detect a totally botched execution
   (like the binary missing). Now it seems to be recorded as a success.
 
