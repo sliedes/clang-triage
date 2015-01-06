@@ -72,6 +72,12 @@ CREDUCE_TIMEOUT = 2*60 + 30
 # failure)
 MISC_REPORT_SAVE_DIR = 'saved'
 
+# If you have llvm-symbolizer in PATH, you will get nicer backtraces
+# in outputs. Its presence will be checked when clang-triage
+# starts. If this variable is set to False, it missing from the path
+# will be downgraded from fatal error to a warning.
+LLVM_SYMBOLIZER_MISSING_IS_FATAL = True
+
 
 ##### Generally you should not need to change anything below this.
 

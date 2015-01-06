@@ -14,6 +14,7 @@ from dumb_reduce import dumb_reduce
 from triage_report import refresh_report
 
 from config import TRIAGE_EXTRA_CLANG_PARAMS, BZIP2_COMMAND
+from config import LLVM_SYMBOLIZER_MISSING_IS_FATAL
 
 
 REDUCES_SINCE_REPORT = 0
@@ -136,8 +137,11 @@ def test_iter(start_from_current=False):
 
 
 def check_prereqs():
-    WARN = [('llvm-symbolizer', 'Recorded outputs may be less useful.'),
-            ('psql', 'Schema creation will not work.')]
+    WARN = [('psql', 'Schema creation will not work.')]
+
+    if not LLVM_SYMBOLIZER_MISSING_IS_FATAL:
+        WARN.append(('llvm-symbolizer',
+                     'Recorded outputs may be less useful.'))
 
     for prog, warn in WARN:
         if shutil.which(prog) is None:
@@ -145,6 +149,9 @@ def check_prereqs():
                   file=sys.stderr)
 
     REQS = ['git', 'ninja', 'creduce', 'timeout', 'tar', BZIP2_COMMAND]
+
+    if LLVM_SYMBOLIZER_MISSING_IS_FATAL:
+        REQS.append('llvm-symbolizer')
 
     err = False
     for prog in REQS:
