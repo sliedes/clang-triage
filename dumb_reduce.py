@@ -70,11 +70,11 @@ def dumb_reduce(data, verbose=False):
     '''Return a 1-byte-minimal case for data. Removing any byte from the
     result will make it not crash or crash in a different way.'''
 
-    reason = test_input(data)[0]
-    assert reason != 'OK'
+    crash = test_input(data)[0]
+    assert crash
 
-    pred = lambda x: test_input(x)[0] == reason
-    #pred = verbose_pred(reason)
+    pred = lambda x: test_input(x)[0] == crash
+    #pred = verbose_pred(crash)
 
     if verbose:
         print('Original case: {} bytes'.format(len(data)), file=sys.stderr)

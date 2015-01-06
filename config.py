@@ -51,6 +51,13 @@ TRIAGE_EXTRA_CLANG_PARAMS = []
 # A map from human-readable names to directories where to run git pull
 PROJECTS = {'llvm': LLVM_SRC, 'clang': LLVM_SRC + '/tools/clang'}
 
+# A map from projects to where to link source locations. An empty map
+# is OK (no linking will be done).
+SOURCE_URLS = {
+    'llvm': 'https://github.com/llvm-mirror/llvm/blob/master/{path}#L{lineno}',
+    'clang': 'https://github.com/llvm-mirror/clang/blob/master/{path}#L{lineno}'
+}
+
 # Path to binary to test
 CLANG_BINARY = BUILD + '/bin/clang'
 

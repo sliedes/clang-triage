@@ -11,10 +11,10 @@ from utils import env_with_tmpdir
 from config import CREDUCE_PROPERTY_SCRIPT, CREDUCE_TIMEOUT
 
 
-def run_creduce(data, reason):
-    'Run CReduce for the data. Give crash reason in reason.'
+def run_creduce(data, crash):
+    'Run CReduce for the data.'
 
-    assert reason, 'Cannot run_creduce() on a non-crashing input.'
+    assert crash, 'Cannot run_creduce() on a non-crashing input.'
     assert (os.path.isfile(CREDUCE_PROPERTY_SCRIPT) and
             os.access(CREDUCE_PROPERTY_SCRIPT, os.X_OK)), (
         'No %s in cwd %s (or not executable).' % (
@@ -28,7 +28,7 @@ def run_creduce(data, reason):
         cpp_fname = os.path.join(creduce_dir, 'buggy.cpp')
         prop_script = os.path.abspath(CREDUCE_PROPERTY_SCRIPT)
         with open(reason_fname, 'w') as f:
-            f.write(reason)
+            f.write(crash.reason)
         with open(cpp_fname, 'wb') as f:
             f.write(data)
 
@@ -46,10 +46,10 @@ def run_creduce(data, reason):
             return None
         with open(cpp_fname, 'rb') as f:
             reduced = f.read()
-    reduced_reason, output = test_input_reduce(reduced)
-    if reason != reduced_reason:
+    reduced_crash, output = test_input_reduce(reduced)
+    if crash != reduced_crash:
         print('CReduced case produces different result: {} != {}'.format(
-            reduced_reason, reason), file=sys.stderr)
+            reduced_crash, crash), file=sys.stderr)
         return None
     return reduced
 
@@ -57,7 +57,7 @@ def run_creduce(data, reason):
 PRINTABLE = string.printable.encode('ascii')
 
 
-def try_remove_nonprintables(contents, reason):
+def try_remove_nonprintables(contents, crash):
     'Minimize the case wrt non-printable characters.'
 
     reduced = b''
@@ -69,7 +69,7 @@ def try_remove_nonprintables(contents, reason):
                 tail = b''
             for replacement in [b'', b' ', b'_']:
                 r, out = test_input_reduce(reduced + replacement + tail)
-                if r == reason:
+                if r == crash:
                     reduced += replacement
                     break
             else:
@@ -82,13 +82,13 @@ def try_remove_nonprintables(contents, reason):
     return reduced
 
 
-def reduce_one(data, reason):
+def reduce_one(data, crash):
     'CReduce this case, then minimize it wrt nonprintables.'
 
-    res = run_creduce(data, reason)
+    res = run_creduce(data, crash)
     if not res:
         return None
-    return try_remove_nonprintables(res, reason)
+    return try_remove_nonprintables(res, crash)
 
 
 def main():

@@ -41,14 +41,14 @@ def reduce_worker_one_iter(db, versions):
     sha, contents = work
     print('Running creduce for ' + sha + '... ', file=sys.stderr, end='')
     sys.stderr.flush()
-    reason = test_input_reduce(contents)[0]
-    assert test_input(contents, [])[0] == reason
-    if not reason:
+    crash = test_input_reduce(contents)[0]
+    assert test_input(contents, [])[0] == crash
+    if not crash:
         print('Input does not crash.', file=sys.stderr)
         db.addReduced(versions, sha, ReduceResult.no_crash)
         REDUCES_SINCE_REPORT += 1
         return True
-    reduced = reduce_one(contents, reason)
+    reduced = reduce_one(contents, crash)
     if not reduced is None:
         print('reduced {} -> {} bytes.'.format(len(contents), len(reduced)),
               file=sys.stderr)
@@ -117,12 +117,13 @@ def test_iter(start_from_current=False):
         i = 1
         numBad = 0
         with mp.Pool() as pool:
-            for sha, (reason, output) in pool.imap_unordered(
+            for sha, (crash, output) in pool.imap_unordered(
                     triage_test_func, db.iterateCases()):
-                if not reason:
+                if not crash:
                     reason = 'OK'
                     output = None
                 else:
+                    reason = crash.reason
                     numBad += 1
                 print('\r{curr}/{max}  {nbad} bad ({prop:.1%})'.format(
                     curr=i, max=numCases, nbad=numBad,
