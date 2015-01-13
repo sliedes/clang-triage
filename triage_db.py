@@ -113,6 +113,32 @@ class TriageDb(object):
             c.execute('SELECT DISTINCT contents FROM reduced_contents')
             return (x[0] for x in c)
 
+    def iterateDumbReduced(self):
+        '''Iterate through distinct dumb-reduced cases. Returns a list
+        of (original, reduced, reason).'''
+        with self.conn:
+            c = self.conn.cursor()
+            # FIXME get the latest failures... and get rid of that
+            # File not yet open hack.
+            c.execute('''
+                SELECT DISTINCT ON (contents) z_contents, contents, str
+                FROM case_contents, reduced_contents, reduced_cases,
+                    result_strings,
+                    (SELECT DISTINCT case_id
+                     FROM reduced_cases AS rc, results, result_strings
+                     WHERE rc.result='dumb' AND original=case_id
+                         AND results.result=result_strings.id
+                         AND result_strings.str<>'OK'
+                         AND result_strings.str LIKE '%File not yet open%')
+                              AS ids
+                WHERE case_contents.case_id=ids.case_id
+                    AND reduced_contents.reduced_id=reduced_cases.id
+                    AND reduced_cases.original=ids.case_id
+                    AND str<>'OK'
+                    AND str NOT LIKE '%File not yet open%'
+                    AND str<>'Stack dump found' ''')
+        return ((zlib.decompress(x[0]), x[1], x[2]) for x in c)
+
     def iterateOutputs(self):
         'Iterate through compiler outputs.'
         with self.conn:

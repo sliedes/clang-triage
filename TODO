@@ -62,12 +62,8 @@ Report
 * Might make sense to sort creduced cases earlier in report than
   dumb-reduced ones?
 
-* Possibly make make_sha_tree() remove old items from the tree
-  (preferably without being racy wrt previous report)
-
-  * However there are nice sides to not removing e.g. old reduced
-    cases so links stay valid even if they are no longer referenced in
-    report
+* Turn output into HTML page, with llvm-symbolizer's locations linked
+  to some viewer.
 
 
 Tools

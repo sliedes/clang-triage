@@ -2,8 +2,8 @@
 
 import sys
 import time
-
 import multiprocessing as mp
+import argparse as argp
 
 from triage_db import TriageDb, ReduceResult
 from repository import update_and_build, get_versions, build
@@ -138,8 +138,23 @@ def main():
 
     mp.set_start_method('forkserver')
 
+    parser = argp.ArgumentParser(description='Clang triage daemon.')
+
+    # FIXME doesn't work because of db constraint violation.
+    # Perhaps we should have an option for replacing a test run? Or
+    # relax the constraint and order test runs in some other way than
+    # by versions?
+    parser.add_argument(
+        '--start-from-current', action='store_true',
+        help='Run test immediately once after git pull even if this '
+        'version has already been tested.')
+    args = parser.parse_args()
+
+    start_from_current = args.start_from_current
+
     while True:
-        test_iter(False)
+        test_iter(start_from_current)
+        start_from_current = False
         maybe_refresh_report(unconditional=True)
 
 
