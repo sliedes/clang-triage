@@ -364,6 +364,8 @@ def generate_report_as_string():
     for f in failures:
         f['cases'][-1]['isLast'] = True
 
+    context['totalFailures'] = sum(x['numCases'] for x in failures)
+
     context['failures'] = failures
     context['numDistinctFailures'] = len(failures)
 
