@@ -1,5 +1,5 @@
 CREATE TABLE test_runs (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     start_time BIGINT NOT NULL,
     end_time BIGINT NOT NULL,
     clang_version INTEGER NOT NULL,

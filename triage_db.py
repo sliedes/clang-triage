@@ -12,6 +12,9 @@ from utils import all_files_recursive
 from config import DB_NAME, CREATE_SCHEMA_COMMAND
 
 
+SCHEMA_VERSION = 2
+
+
 class ReduceResult(Enum):
     'A reduce result.'
 
@@ -46,6 +49,67 @@ class TriageDb(object):
                     self.OK_ID = c.fetchone()[0]
                 except pg.ProgrammingError:
                     raise DbNotInitialized()
+        with self.conn:
+            version = self.__get_schema_version()
+        if version > SCHEMA_VERSION:
+            print('Error: Unexpectedly high schema version {} '
+                  '(expected at most {})'.format(
+                      version, SCHEMA_VERSION), file=sys.stderr)
+            sys.exit(1)
+        elif version < SCHEMA_VERSION:
+            with self.conn:
+                self.__migrate_schema(version)
+            with self.conn:
+                newver = self.__get_schema_version()
+                assert newver == SCHEMA_VERSION, newver
+
+    def __get_schema_version(self):
+        with self.conn.cursor() as c:
+            try:
+                c.execute("SELECT value FROM params " +
+                          "    WHERE name='schema_version'")
+                return int(c.fetchone()[0])
+            except pg.ProgrammingError:
+                # version 1 did not have the params table
+                return 1
+
+    def __migrate_schema_v1_v2(self):
+        # changes from 1 to 2:
+        #   * CREATE TABLE params with schema_version row
+        #   * compress test run ids, no longer use serial but max(id)+1
+        with self.conn.cursor() as c:
+            print('Migrating schema v1..v2...', file=sys.stderr)
+            with self.conn.cursor() as c:
+                c.execute('CREATE TABLE params ( '
+                          '    name TEXT PRIMARY KEY, '
+                          '    value TEXT)')
+                c.execute("INSERT INTO params VALUES ('schema_version', '2')")
+                c.execute('ALTER TABLE test_runs ALTER id DROP DEFAULT')
+                c.execute('DROP SEQUENCE test_runs_id_seq')
+        while True:
+            with self.conn.cursor() as c:
+                c.execute('SELECT id FROM test_runs ORDER BY id')
+                ids = [x[0] for x in c]
+                maximum = ids[-1]
+                new = 1
+                updates = []
+                for orig in ids:
+                    if orig != new:
+                        updates.append((new, orig))
+                    new += 1
+            if not updates:
+                break
+            remaining = len(updates)
+            updates = updates[:10]
+            print('  {} remaining...'.format(remaining), file=sys.stderr)
+            with self.conn.cursor() as c:
+                c.executemany('UPDATE test_runs SET id=%s WHERE id=%s',
+                              updates)
+
+    def __migrate_schema(self, version):
+        assert version < SCHEMA_VERSION
+        if version == 1:
+            self.__migrate_schema_v1_v2()
 
     @staticmethod
     def createSchema():
@@ -164,9 +228,10 @@ class TriageDb(object):
         with self.conn:
             with self.conn.cursor() as c:
                 c.execute(
-                    'INSERT INTO test_runs (start_time, end_time, ' +
-                    '    clang_version, llvm_version) ' +
-                    'VALUES (%s, %s, %s, %s) RETURNING id',
+                    'INSERT INTO test_runs (id, start_time, end_time, '
+                    '    clang_version, llvm_version) '
+                    'SELECT MAX(id)+1, %s, %s, %s, %s FROM test_runs '
+                    '    RETURNING id',
                     (start_time, end_time, clang_version, llvm_version))
                 run_id = c.fetchone()[0]
                 self._addResults(c, run_id, results)

@@ -2,6 +2,12 @@
 \i reduce.sql
 \i test_runs.sql
 
+CREATE TABLE params (
+    name TEXT PRIMARY KEY,
+    value TEXT NOT NULL);
+
+INSERT INTO params VALUES ('schema_version', 2);
+
 CREATE VIEW last_2_runs_view AS
     SELECT id FROM test_runs
     ORDER BY id DESC LIMIT 2;
