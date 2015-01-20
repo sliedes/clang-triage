@@ -10,6 +10,7 @@ import sys
 
 from utils import all_files_recursive
 from config import DB_NAME, CREATE_SCHEMA_COMMAND
+import schema_migration
 
 
 SCHEMA_VERSION = 2
@@ -73,43 +74,9 @@ class TriageDb(object):
                 # version 1 did not have the params table
                 return 1
 
-    def __migrate_schema_v1_v2(self):
-        # changes from 1 to 2:
-        #   * CREATE TABLE params with schema_version row
-        #   * compress test run ids, no longer use serial but max(id)+1
-        with self.conn.cursor() as c:
-            print('Migrating schema v1..v2...', file=sys.stderr)
-            with self.conn.cursor() as c:
-                c.execute('CREATE TABLE params ( '
-                          '    name TEXT PRIMARY KEY, '
-                          '    value TEXT)')
-                c.execute("INSERT INTO params VALUES ('schema_version', '2')")
-                c.execute('ALTER TABLE test_runs ALTER id DROP DEFAULT')
-                c.execute('DROP SEQUENCE test_runs_id_seq')
-        while True:
-            with self.conn.cursor() as c:
-                c.execute('SELECT id FROM test_runs ORDER BY id')
-                ids = [x[0] for x in c]
-                maximum = ids[-1]
-                new = 1
-                updates = []
-                for orig in ids:
-                    if orig != new:
-                        updates.append((new, orig))
-                    new += 1
-            if not updates:
-                break
-            remaining = len(updates)
-            updates = updates[:10]
-            print('  {} remaining...'.format(remaining), file=sys.stderr)
-            with self.conn.cursor() as c:
-                c.executemany('UPDATE test_runs SET id=%s WHERE id=%s',
-                              updates)
-
     def __migrate_schema(self, version):
         assert version < SCHEMA_VERSION
-        if version == 1:
-            self.__migrate_schema_v1_v2()
+        schema_migration.MIGRATE_FROM[version](self.conn)
 
     @staticmethod
     def createSchema():
