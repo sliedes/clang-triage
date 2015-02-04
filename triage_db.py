@@ -107,8 +107,10 @@ class TriageDb(object):
             with self.conn.cursor() as c:
                 c.executemany(
                     'INSERT INTO case_view (sha1, z_contents, size) ' +
-                    'VALUES (%s, %s, %s)',
-                    ((x[0], zlib.compress(x[1]), len(x[1]))
+                    'SELECT %s, %s, %s ' +
+                    'WHERE NOT EXISTS (' +
+                    '    SELECT sha1 FROM case_view WHERE sha1=%s)',
+                    ((x[0], zlib.compress(x[1]), len(x[1]), x[0])
                      for x in cases))
 
     def populateCases(self, cases_path, stop_after=None):
